@@ -1,0 +1,1381 @@
+# STARTING ALL OVER #
+####Load libraries####
+library(BBmisc)
+library(ggplot2)
+library("scales")
+library(colorRamps)
+library(tidyverse)
+library(car)
+library(ape)
+library(DAAG)
+library(reshape2)
+library(ggmap)
+library(lubridate)
+library(data.table) # v1.9.6+
+library(tidyquant)
+library(scales)
+library(RColorBrewer)
+library(pracma)
+library(magrittr)
+library(dplyr)
+library(lubridate)
+library(miscTools)
+library(rgdal)
+library(caTools)
+library(zoo)
+library(smooth)
+library(pracma)
+
+
+
+
+
+#### Load functions ####
+# source('make_lur_rebuilt.R')
+source(paste(getwd(),"functions",'make_lur_rebuilt.R', sep = "/"))
+source(paste(getwd(),"functions",'run_LUR_all_rebuilt.R', sep = "/"))
+#### Load data - ####
+fldrDat <- "dataFolderForRead"
+homefldr <- getwd()
+#### FileNames ####
+IndepVarsGIS_File <- "LURdf_good.csv"
+Polygon_File <- "polygonData.csv"
+PolygonForMobile_File = "AggID_matched_Polygons.csv"
+MobileTseries_File <- "OaklandData_clip.csv"
+ReferenceMonitorTSeries_File <- "MobileData_centralMons.csv"
+#### Load and build lists to refer to ####
+OAfactors <- c('COA', 'HOA', 'SVOOA')
+PM1species <- c('HRNO3', 'HRSO4', 'HRChl', 'HROrg', 'HRNH4')
+AllAMS <- c(OAfactors,PM1species,'NRPM1')
+PrimaryOA <- c('COA','HOA')
+IndepVarsFile = "indepVarlist2.csv" #read in all possible variable names from file
+IndepVarsList = readLines(paste(homefldr,fldrDat,IndepVarsFile, sep = "/"))
+DepVarsFile  = "datanames.csv" #read in all possible variable names from file
+DepVarsList = readLines(paste(homefldr,fldrDat,DepVarsFile, sep = "/"))
+RoadGISVars = c("Total_Road_50", "Total_Road_100", "Total_Road_250", "Total_Road_500", "Total_Road_1000", "Total_Road_2500", "Hwy_Road_50", "Hwy_Road_100", "Hwy_Road_250", "Hwy_Road_500", "Hwy_Road_1000", "Hwy_Road_2500", "Maj_Road_50", "Maj_Road_100", "Maj_Road_250", "Major_Road_500", "Major_Road_1000", "Major_Road_2500", "Res_Road_50", "Res_Road_100", "Res_Road_250", "Res_Road_500", "Res_Road_1000","Res_Road_2500") 
+BusGISVars = c("DailyTripsCount_50m", "DailyTripsCount_100m", "DailyTripsCount_250m", "DailyTripsCount_500m", "DailyTripsCount_1000m")
+RestCountGISVars = c("RestCount_50m", "RestCount_100m", "RestCount_250m", "RestCount_500m", "RestCount_1000m", "RestCount_2500m")
+HighDevelopmentGISVars = c("NLCD_DevHigh_50","NLCD_DevHigh_100","NLCD_DevHigh_250","NLCD_DevHigh_500","NLCD_DevHigh_1000","NLCD_DevHigh_2500")
+PopGISVars = c("Pop_50", "Pop_100", "Pop_250", "Pop_500", "Pop_1000", "Pop_2500")
+BackgroundMonitorVars = c("PM25ref_avg", "PM25ref_median", "LaneyPM25ref_avg", "LaneyPM25ref_median", "PM25ref_smth_avg", "PM25ref_smth_median", "PM25ref_smth_med_avg", "PM25ref_smth_med_median", "LaneyPM25ref_smth_avg", "LaneyPM25ref_smth_median", "LaneyPM25ref_smth_med_avg", "LaneyPM25ref_smth_med_median")
+BackgroundMonitor_JustWOakLaney = c("PM25ref_avg", "LaneyPM25ref_avg")
+VegetationGISVars = c("NDVI_50", "NDVI_100", "NDVI_250", "NDVI_500", "NDVI_1000", "NDVI_2500")
+NLCDGISVars = c("NLCD_Water_50", "NLCD_DevOpen_50", "NLCD_DevLow_50", "NLCD_DevMed_50", "NLCD_DevHigh_50", "NLCD_Barren_50", "NLCD_Deciduous_50", "NLCD_Evergreen_50", "NLCD_MixForest_50", "NLCD_Shrub_50", "NLCD_Herbaceous_50", "NLCD_Pasture_50", "NLCD_Crops_50", "NLCD_WoodyWet_50", "NLCD_EmergWet_50", "NLCD_Water_100", "NLCD_DevOpen_100", "NLCD_DevLow_100", "NLCD_DevMed_100", "NLCD_DevHigh_100", "NLCD_Barren_100", "NLCD_Deciduous_100", "NLCD_Evergreen_100", "NLCD_MixForest_100", "NLCD_Shrub_100", "NLCD_Herbaceous_100", "NLCD_Pasture_100", "NLCD_Crops_100", "NLCD_WoodyWet_100", "NLCD_EmergWet_100", "NLCD_Water_250", "NLCD_DevOpen_250", "NLCD_DevLow_250", "NLCD_DevMed_250", "NLCD_DevHigh_250", "NLCD_Barren_250", "NLCD_Deciduous_250", "NLCD_Evergreen_250", "NLCD_MixForest_250", "NLCD_Shrub_250", "NLCD_Herbaceous_250", "NLCD_Pasture_250", "NLCD_Crops_250", "NLCD_WoodyWet_250", "NLCD_EmergWet_250", "NLCD_Water_500", "NLCD_DevOpen_500", "NLCD_DevLow_500", "NLCD_DevMed_500", "NLCD_DevHigh_500", "NLCD_Barren_500", "NLCD_Deciduous_500", "NLCD_Evergreen_500", "NLCD_MixForest_500", "NLCD_Shrub_500", "NLCD_Herbaceous_500", "NLCD_Pasture_500", "NLCD_Crops_500", "NLCD_WoodyWet_500", "NLCD_EmergWet_500", "NLCD_Water_1000", "NLCD_DevOpen_1000", "NLCD_DevLow_1000", "NLCD_DevMed_1000", "NLCD_DevHigh_1000", "NLCD_Barren_1000", "NLCD_Deciduous_1000", "NLCD_Evergreen_1000", "NLCD_MixForest_1000", "NLCD_Shrub_1000", "NLCD_Herbaceous_1000", "NLCD_Pasture_1000", "NLCD_Crops_1000", "NLCD_WoodyWet_1000", "NLCD_EmergWet_1000", "NLCD_Water_2500", "NLCD_DevOpen_2500", "NLCD_DevLow_2500", "NLCD_DevMed_2500", "NLCD_DevHigh_2500", "NLCD_Barren_2500", "NLCD_Deciduous_2500", "NLCD_Evergreen_2500", "NLCD_MixForest_2500", "NLCD_Shrub_2500", "NLCD_Herbaceous_2500", "NLCD_Pasture_2500", "NLCD_Crops_2500", "NLCD_WoodyWet_2500", "NLCD_EmergWet_2500")
+PortGISVars = c("MinDist2MainPort", "XpsExpPort_100", "XpsEXP_Port_500", "XpsEXP_Port_1000", "XpsEXP_Port_5000", "XpsEXP_Port_10K", "XpsExp_MainPort_100", "XpsExp_MainPort_500", "XpsEXP_MainPort_1000", "XpsEXP_MainPort_5000", "XpsEXP_MainPort_10K")
+ImperviousGISVars = c("Impervious_50", "Impervious_100", "Impervious_250", "Impervious_500", "Impervious_1000", "Impervious_2500")
+ElevationGISVars = c("Elevation_50", "Elevation_100", "Elevation_250", "Elevation_500", "Elevation_1000", "Elevation_2500" )
+CookingGISVars = c(RestCountGISVars, HighDevelopmentGISVars, PopGISVars)
+TrafficGISVars = c(RoadGISVars,BusGISVars,ImperviousGISVars)
+FullListGISVars = c(VegetationGISVars, 
+                    NLCDGISVars, 
+                    ElevationGISVars, 
+                    ImperviousGISVars, 
+                    PopGISVars,
+                    PortGISVars,
+                    RoadGISVars, 
+                    BusGISVars, 
+                    RestCountGISVars, 
+                    ElevationGISVars)
+#### Make dataframes ####
+IndepVarsGIS_df <- read.csv(paste(homefldr, fldrDat, IndepVarsGIS_File, sep = "/"), sep = ",", header = TRUE)
+Polygon_df <- read.csv(paste(homefldr, fldrDat, Polygon_File, sep = "/"), sep = ",", header = TRUE)
+Polygon_df2 <- read.csv(paste(homefldr, fldrDat, PolygonForMobile_File, sep = "/"), sep = ",", header = TRUE)
+MobileTseries_df <- read.csv(paste(homefldr, fldrDat, MobileTseries_File, sep = "/"), sep = ",", header = TRUE)
+ReferenceMonitorTSeries_df <- read.csv(paste(homefldr, fldrDat, ReferenceMonitorTSeries_File, sep = "/"), sep = ",", header = TRUE)
+#### Clean up individual dataframes before merging ####
+# 1. IndepVarsGIS_df
+IndepVarsGIS_df = subset(IndepVarsGIS_df, select = -c(X))
+# 2. Polygon_df & Polygon_df2
+Polygon_df <- subset(Polygon_df, select = -c(X))
+Polygon_df2 <- subset(Polygon_df2, select = -c(X,Latitude,Longitude))
+# 3. MobileTseries_df
+colnames(MobileTseries_df)[colnames(MobileTseries_df) == 'Lat'] <- 'Latitude'
+colnames(MobileTseries_df)[colnames(MobileTseries_df) == 'Lon'] <- 'Longitude'
+MobileTseries_df$datetime <- as.POSIXct(strptime(MobileTseries_df$Local_time, "%m/%d/%Y %H:%M:%S"))
+MobileTseries_df$hourOnly <- hour(MobileTseries_df$datetime)
+MobileTseries_df$datesOnly <- as.POSIXct(strptime(MobileTseries_df$Local_time, "%m/%d/%Y"))
+MobileTseries_df <- subset(MobileTseries_df, select = -c(OID, NEAR_X, NEAR_Y, ObjectID_m, Field1, ObjectIDMa, PM25ref, Serial_Tim, Local_time))
+MobileTseries_df$Group <- findInterval(MobileTseries_df$hourOnly, c(0, 11, 14, 24), rightmost.closed = TRUE) #create groups: 1 = morning, 2 = lunch, 3 = afternoon
+MobileTseries_df$NRPM1 <- rowSums(MobileTseries_df[ , PM1species])
+MobileTseries_df <- merge(MobileTseries_df, Polygon_df2, by = "NEAR_FID")
+
+# 4. ReferenceMonitorTSeries_df
+ReferenceMonitorTSeries_df$datetime <- as.POSIXct(strptime(ReferenceMonitorTSeries_df$datetime, "%Y-%m-%d %H:%M:%S"))
+ReferenceMonitorTSeries_df <- subset(ReferenceMonitorTSeries_df, select = -c(X, ObjectIDMa))
+colnames(ReferenceMonitorTSeries_df)
+
+# make date only dfMobile$
+# make hour only
+# make hours-grouping as.factor
+# combine
+
+#### Merge Dataframes - make FINAL pre-filtered Site and Time-based Dfs ####
+Sites_df <- merge(IndepVarsGIS_df, Polygon_df, by = "NEAR_FID")
+Mobile_df <- merge(MobileTseries_df, ReferenceMonitorTSeries_df, by = "datetime")
+rm("Polygon_df2","IndepVarsGIS_df","MobileTseries_df","ReferenceMonitorTSeries_df") ##clean up workspace!
+#### Do background substraction for HOA and COA
+
+dates = unique(as.Date(Mobile_df$datesOnly))
+for(day in 1:length(dates)){
+  selectors <- c("HOA","COA") # columns to background subtract from
+  rolNum <- 2*180
+  if(day == 1){
+    print(dates[day])
+    df_day <- filter(Mobile_df, as.Date(datesOnly) == dates[day]) %>% select(selectors)
+    df_day$COA_bgRemoved <- df_day$COA - as.numeric(runmed(x = df_day$COA, k = rolNum))#, endrule = "min")
+    df_day$HOA_bgRemoved <- df_day$HOA - as.numeric(runmed(x = df_day$HOA, k = rolNum))#, endrule = "min")
+    df_day <- df_day %>% mutate(HOA_bgRemoved = ifelse(HOA_bgRemoved < 0, 0, HOA_bgRemoved))
+    df_day <- df_day %>% mutate(COA_bgRemoved = ifelse(COA_bgRemoved < 0, 0, COA_bgRemoved))
+  } else {
+    df_prev <- df_day
+    df_day <- filter(Mobile_df, as.Date(datesOnly) == dates[day]) %>% select(selectors)
+    df_day$COA_bgRemoved <- df_day$COA - as.numeric(runmed(x = df_day$COA, k = rolNum))#, endrule = "min")
+    df_day$HOA_bgRemoved <- df_day$HOA - as.numeric(runmed(x = df_day$HOA, k = rolNum))#, endrule = "min")
+    df_day <- df_day %>% mutate(HOA_bgRemoved = ifelse(HOA_bgRemoved < 0, 0, HOA_bgRemoved))
+    df_day <- df_day %>% mutate(COA_bgRemoved = ifelse(COA_bgRemoved < 0, 0, COA_bgRemoved))
+    df_day <- rbind(df_prev,df_day)
+  }
+}
+newselectors <- c("HOA_bgRemoved","COA_bgRemoved")
+df_day <- select(df_day, newselectors)
+Mobile_df <- cbind(Mobile_df,df_day)
+
+
+
+#### Get drive-day and day-section averages ####
+# 1. By Full day
+GroupedDriveDay_df <- Mobile_df %>%
+  group_by(datesOnly, NEAR_FID) %>% 
+  summarize(count = n(),
+            Latitude = mean(Latitude),
+            Longitude = mean(Longitude),
+            Polygon = first(Polygon),
+            BigPolygon = first(BigPolygon),
+            hourMean = mean(hourOnly),
+            hourMax = max(hourOnly),
+            hourMin = min(hourOnly),
+            CO_20sMean = mean(CO_20sMean),
+            CO2_20sMea = mean(CO2_20sMea),
+            PN_20sMean = mean(PN_20sMean),
+            HROrg = mean(HROrg),
+            HRNH4 = mean(HRNH4),
+            HRSO4 = mean(HRSO4),
+            HRNO3 = mean(HRNO3),
+            HRChl = mean(HRChl),
+            HROrg44 = mean(HROrg44),
+            HROrg55 = mean(HROrg55),
+            C4H7 = mean(C4H7),
+            HROrg57 = mean(HROrg57),
+            C4H9 = mean(C4H9),
+            C6H10O = mean(C6H10O),
+            H_C = mean(H_C),
+            O_C = mean(O_C),
+            SVOOA = mean(SVOOA),
+            COA = mean(COA),
+            COA_bgRemoved = mean(COA_bgRemoved),
+            HOA = mean(HOA),
+            HOA_bgRemoved = mean(HOA_bgRemoved),
+            NRPM1 = mean(NRPM1),
+            PM25ref = mean(PM25ref),
+            BCref = mean(BCref),
+            LaneyPM25ref = mean(LaneyPM25ref),
+            PM25ref_smth = mean(PM25ref_smth),
+            LaneyPM25ref_smth = mean(LaneyPM25ref_smth),
+            PM25ref_smth_med = mean(PM25ref_smth_med),
+            LaneyPM25ref_smth_med = mean(LaneyPM25ref_smth_med)
+  )
+write.csv(file = "GroupedDriveDay_df.csv", x = GroupedDriveDay_df)
+####
+
+DriveDayFull_df_sub <- GroupedDriveDay_df_sub %>%
+  group_by(NEAR_FID) %>% 
+  sample_n(10) %>%
+  summarise(
+    count = n(), 
+    Latitude = mean(Latitude),
+    Longitude = mean(Longitude),
+    hour_Avg = mean(hourMean),
+    hour_Med = median(hourMean),
+    Polygon = first(Polygon),
+    BigPolygon = first(BigPolygon),
+    CO_20sMean_avg = mean(CO_20sMean),
+    CO_20sMean_logavg = log(mean(CO_20sMean)),
+    CO_20sMean_median = median(CO_20sMean, na.rm = TRUE),
+    CO2_20sMea_avg = mean(CO2_20sMea),
+    CO2_20sMea_logavg = log(mean(CO2_20sMea)),
+    CO2_20sMea_median = median(CO2_20sMea, na.rm = TRUE),
+    PN_20sMean_avg = mean(PN_20sMean),
+    PN_20sMean_logavg = log(mean(PN_20sMean)),
+    PN_20sMean_median = median(PN_20sMean, na.rm = TRUE),
+    HROrg_avg = mean(HROrg),
+    HROrg_logavg = log(mean(HROrg)),
+    HROrg_median = median(HROrg, na.rm = TRUE),
+    HRNH4_avg = mean(HRNH4),
+    HRNH4_logavg = log(mean(HRNH4)),
+    HRNH4_median = median(HRNH4, na.rm = TRUE),
+    HRSO4_avg = mean(HRSO4),
+    HRSO4_logavg = log(mean(HRSO4)),
+    HRSO4_median = median(HRSO4, na.rm = TRUE),
+    HRNO3_avg = mean(HRNO3),
+    HRNO3_logavg = log(mean(HRNO3)),
+    HRNO3_median = median(HRNO3, na.rm = TRUE),
+    HRChl_avg = mean(HRChl),
+    HRChl_logavg = log(mean(HRChl)),
+    HRChl_median = median(HRChl, na.rm = TRUE),
+    HROrg44_avg = mean(HROrg44),
+    HROrg44_logavg = log(mean(HROrg44)),
+    HROrg44_median = median(HROrg44, na.rm = TRUE),
+    HROrg55_avg = mean(HROrg55),
+    HROrg55_logavg = log(mean(HROrg55)),
+    HROrg55_median = median(HROrg55, na.rm = TRUE),
+    C4H7_avg = mean(C4H7),
+    C4H7_logavg = log(mean(C4H7)),
+    C4H7_median = median(C4H7, na.rm = TRUE),
+    HROrg57_avg = mean(HROrg57),
+    HROrg57_logavg = log(mean(HROrg57)),
+    HROrg57_median = median(HROrg57, na.rm = TRUE),
+    C4H9_avg = mean(C4H9),
+    C4H9_logavg = log(mean(C4H9)),
+    C4H9_median = median(C4H9, na.rm = TRUE),
+    C6H10O_avg = mean(C6H10O),
+    C6H10O_logavg = log(mean(C6H10O)),
+    C6H10O_median = median(C6H10O, na.rm = TRUE),
+    H_C_avg = mean(H_C),
+    H_C_logavg = log(mean(H_C)),
+    H_C_median = median(H_C, na.rm = TRUE),
+    O_C_avg = mean(O_C),
+    O_C_logavg = log(mean(O_C)),
+    O_C_median = median(O_C, na.rm = TRUE),
+    SVOOA_avg = mean(SVOOA),
+    SVOOA_logavg = log(mean(SVOOA)),
+    SVOOA_median = median(SVOOA, na.rm = TRUE),
+    COA_avg = mean(COA),
+    COA_logavg = log(mean(COA)),
+    COA_median = median(COA, na.rm = TRUE),
+    HOA_avg = mean(HOA),
+    HOA_logavg = log(mean(HOA)),
+    HOA_median = median(HOA, na.rm = TRUE),
+    NRPM1_avg = mean(NRPM1),
+    NRPM1_logavg = log(mean(NRPM1)),
+    NRPM1_median = median(NRPM1, na.rm = TRUE),
+    PM25ref_avg = mean(PM25ref),
+    PM25ref_logavg = log(mean(PM25ref)),
+    PM25ref_median = median(PM25ref, na.rm = TRUE),
+    PM25ref_smth_avg = mean(PM25ref_smth),
+    PM25ref_smth_logavg = log(mean(PM25ref_smth)),
+    PM25ref_smth_median = median(PM25ref_smth, na.rm = TRUE),
+    PM25ref_smth_med_avg = mean(PM25ref_smth_med),
+    PM25ref_smth_med_logavg = log(mean(PM25ref_smth_med)),
+    PM25ref_smth_med_median = median(PM25ref_smth_med, na.rm = TRUE),
+    BCref_avg = mean(BCref),
+    BCref_logavg = log(mean(BCref)),
+    BCref_median = median(BCref, na.rm = TRUE),
+    LaneyPM25ref_avg = mean(LaneyPM25ref),
+    LaneyPM25ref_logavg = log(mean(LaneyPM25ref)),
+    LaneyPM25ref_median = median(LaneyPM25ref, na.rm = TRUE),
+    LaneyPM25ref_smth_avg = mean(LaneyPM25ref_smth),
+    LaneyPM25ref_smth_logavg = log(mean(LaneyPM25ref_smth)),
+    LaneyPM25ref_smth_median = median(LaneyPM25ref_smth, na.rm = TRUE),
+    LaneyPM25ref_smth_med_avg = mean(LaneyPM25ref_smth_med),
+    LaneyPM25ref_smth_med_logavg = log(mean(LaneyPM25ref_smth_med)),
+    LaneyPM25ref_smth_med_median = median(LaneyPM25ref_smth_med, na.rm = TRUE)
+  )
+
+
+
+#####
+
+
+
+
+DriveDayFull_df <- GroupedDriveDay_df %>%
+  group_by(NEAR_FID) %>%
+  summarise(
+    count = n(), 
+    Latitude = mean(Latitude),
+    Longitude = mean(Longitude),
+    hour_Avg = mean(hourMean),
+    hour_Med = median(hourMean),
+    Polygon = first(Polygon),
+    BigPolygon = first(BigPolygon),
+    CO_20sMean_avg = mean(CO_20sMean),
+    CO_20sMean_logavg = log(mean(CO_20sMean)),
+    CO_20sMean_median = median(CO_20sMean, na.rm = TRUE),
+    CO2_20sMea_avg = mean(CO2_20sMea),
+    CO2_20sMea_logavg = log(mean(CO2_20sMea)),
+    CO2_20sMea_median = median(CO2_20sMea, na.rm = TRUE),
+    PN_20sMean_avg = mean(PN_20sMean),
+    PN_20sMean_logavg = log(mean(PN_20sMean)),
+    PN_20sMean_median = median(PN_20sMean, na.rm = TRUE),
+    HROrg_avg = mean(HROrg),
+    HROrg_logavg = log(mean(HROrg)),
+    HROrg_median = median(HROrg, na.rm = TRUE),
+    HRNH4_avg = mean(HRNH4),
+    HRNH4_logavg = log(mean(HRNH4)),
+    HRNH4_median = median(HRNH4, na.rm = TRUE),
+    HRSO4_avg = mean(HRSO4),
+    HRSO4_logavg = log(mean(HRSO4)),
+    HRSO4_median = median(HRSO4, na.rm = TRUE),
+    HRNO3_avg = mean(HRNO3),
+    HRNO3_logavg = log(mean(HRNO3)),
+    HRNO3_median = median(HRNO3, na.rm = TRUE),
+    HRChl_avg = mean(HRChl),
+    HRChl_logavg = log(mean(HRChl)),
+    HRChl_median = median(HRChl, na.rm = TRUE),
+    HROrg44_avg = mean(HROrg44),
+    HROrg44_logavg = log(mean(HROrg44)),
+    HROrg44_median = median(HROrg44, na.rm = TRUE),
+    HROrg55_avg = mean(HROrg55),
+    HROrg55_logavg = log(mean(HROrg55)),
+    HROrg55_median = median(HROrg55, na.rm = TRUE),
+    C4H7_avg = mean(C4H7),
+    C4H7_logavg = log(mean(C4H7)),
+    C4H7_median = median(C4H7, na.rm = TRUE),
+    HROrg57_avg = mean(HROrg57),
+    HROrg57_logavg = log(mean(HROrg57)),
+    HROrg57_median = median(HROrg57, na.rm = TRUE),
+    C4H9_avg = mean(C4H9),
+    C4H9_logavg = log(mean(C4H9)),
+    C4H9_median = median(C4H9, na.rm = TRUE),
+    C6H10O_avg = mean(C6H10O),
+    C6H10O_logavg = log(mean(C6H10O)),
+    C6H10O_median = median(C6H10O, na.rm = TRUE),
+    H_C_avg = mean(H_C),
+    H_C_logavg = log(mean(H_C)),
+    H_C_median = median(H_C, na.rm = TRUE),
+    O_C_avg = mean(O_C),
+    O_C_logavg = log(mean(O_C)),
+    O_C_median = median(O_C, na.rm = TRUE),
+    SVOOA_avg = mean(SVOOA),
+    SVOOA_logavg = log(mean(SVOOA)),
+    SVOOA_median = median(SVOOA, na.rm = TRUE),
+    COA_avg = mean(COA),
+    COA_logavg = log(mean(COA)),
+    COA_median = median(COA, na.rm = TRUE),
+    COA_75thperc = quantile(COA, probs = 0.75, na.rm = TRUE),
+    COA_90thperc = quantile(COA, probs = 0.90, na.rm = TRUE),
+    COA_bgRem_avg = mean(COA_bgRemoved),
+    COA_bgRem_logavg = log(mean(COA_bgRemoved)),
+    COA_bgRem_median = median(COA_bgRemoved, na.rm = TRUE),
+    COA_bgRem_75thperc = quantile(COA_bgRemoved, probs = 0.75, na.rm = TRUE),
+    COA_bgRem_90thperc = quantile(COA_bgRemoved, probs = 0.90, na.rm = TRUE),
+    HOA_avg = mean(HOA),
+    HOA_logavg = log(mean(HOA)),
+    HOA_median = median(HOA, na.rm = TRUE),
+    HOA_75thperc = quantile(HOA, probs = 0.75, na.rm = TRUE),
+    HOA_90thperc = quantile(HOA, probs = 0.90, na.rm = TRUE),
+    HOA_bgRem_avg = mean(HOA_bgRemoved),
+    HOA_bgRem_logavg = log(mean(HOA_bgRemoved)),
+    HOA_bgRem_median = median(HOA_bgRemoved, na.rm = TRUE),
+    HOA_bgRem_75thperc = quantile(HOA_bgRemoved, probs = 0.75, na.rm = TRUE),
+    HOA_bgRem_90thperc = quantile(HOA_bgRemoved, probs = 0.90, na.rm = TRUE),
+    NRPM1_avg = mean(NRPM1),
+    NRPM1_logavg = log(mean(NRPM1)),
+    NRPM1_median = median(NRPM1, na.rm = TRUE),
+    PM25ref_avg = mean(PM25ref),
+    PM25ref_logavg = log(mean(PM25ref)),
+    PM25ref_median = median(PM25ref, na.rm = TRUE),
+    PM25ref_smth_avg = mean(PM25ref_smth),
+    PM25ref_smth_logavg = log(mean(PM25ref_smth)),
+    PM25ref_smth_median = median(PM25ref_smth, na.rm = TRUE),
+    PM25ref_smth_med_avg = mean(PM25ref_smth_med),
+    PM25ref_smth_med_logavg = log(mean(PM25ref_smth_med)),
+    PM25ref_smth_med_median = median(PM25ref_smth_med, na.rm = TRUE),
+    BCref_avg = mean(BCref),
+    BCref_logavg = log(mean(BCref)),
+    BCref_median = median(BCref, na.rm = TRUE),
+    LaneyPM25ref_avg = mean(LaneyPM25ref),
+    LaneyPM25ref_logavg = log(mean(LaneyPM25ref)),
+    LaneyPM25ref_median = median(LaneyPM25ref, na.rm = TRUE),
+    LaneyPM25ref_smth_avg = mean(LaneyPM25ref_smth),
+    LaneyPM25ref_smth_logavg = log(mean(LaneyPM25ref_smth)),
+    LaneyPM25ref_smth_median = median(LaneyPM25ref_smth, na.rm = TRUE),
+    LaneyPM25ref_smth_med_avg = mean(LaneyPM25ref_smth_med),
+    LaneyPM25ref_smth_med_logavg = log(mean(LaneyPM25ref_smth_med)),
+    LaneyPM25ref_smth_med_median = median(LaneyPM25ref_smth_med, na.rm = TRUE)
+  )
+
+# 2. Morning
+MobileGroup1_df <- filter(Mobile_df, Group == 1)
+GroupedDriveDayGroup1_df <- MobileGroup1_df %>%
+  group_by(datesOnly, NEAR_FID) %>% 
+  summarize(count = n(),
+            Latitude = mean(Latitude),
+            Longitude = mean(Longitude),
+            Polygon = first(Polygon),
+            BigPolygon = first(BigPolygon),
+            hourMean = mean(hourOnly),
+            hourMax = max(hourOnly),
+            hourMin = min(hourOnly),
+            CO_20sMean = mean(CO_20sMean),
+            CO2_20sMea = mean(CO2_20sMea),
+            PN_20sMean = mean(PN_20sMean),
+            HROrg = mean(HROrg),
+            HRNH4 = mean(HRNH4),
+            HRSO4 = mean(HRSO4),
+            HRNO3 = mean(HRNO3),
+            HRChl = mean(HRChl),
+            HROrg44 = mean(HROrg44),
+            HROrg55 = mean(HROrg55),
+            C4H7 = mean(C4H7),
+            HROrg57 = mean(HROrg57),
+            C4H9 = mean(C4H9),
+            C6H10O = mean(C6H10O),
+            H_C = mean(H_C),
+            O_C = mean(O_C),
+            SVOOA = mean(SVOOA),
+            COA = mean(COA),
+            COA_bgRemoved = mean(COA_bgRemoved),
+            HOA = mean(HOA),
+            HOA_bgRemoved = mean(HOA_bgRemoved),
+            NRPM1 = mean(NRPM1),
+            PM25ref = mean(PM25ref),
+            BCref = mean(BCref),
+            LaneyPM25ref = mean(LaneyPM25ref),
+            PM25ref_smth = mean(PM25ref_smth),
+            LaneyPM25ref_smth = mean(LaneyPM25ref_smth),
+            PM25ref_smth_med = mean(PM25ref_smth_med),
+            LaneyPM25ref_smth_med = mean(LaneyPM25ref_smth_med)
+  )
+
+DriveDayGroup1_df <- GroupedDriveDayGroup1_df %>%
+  group_by(NEAR_FID) %>%
+  summarise(
+    count = n(), 
+    Latitude = mean(Latitude),
+    Longitude = mean(Longitude),
+    hour_Avg = mean(hourMean),
+    hour_Med = median(hourMean),
+    Polygon = first(Polygon),
+    BigPolygon = first(BigPolygon),
+    CO_20sMean_avg = mean(CO_20sMean),
+    CO_20sMean_logavg = log(mean(CO_20sMean)),
+    CO_20sMean_median = median(CO_20sMean, na.rm = TRUE),
+    CO2_20sMea_avg = mean(CO2_20sMea),
+    CO2_20sMea_logavg = log(mean(CO2_20sMea)),
+    CO2_20sMea_median = median(CO2_20sMea, na.rm = TRUE),
+    PN_20sMean_avg = mean(PN_20sMean),
+    PN_20sMean_logavg = log(mean(PN_20sMean)),
+    PN_20sMean_median = median(PN_20sMean, na.rm = TRUE),
+    HROrg_avg = mean(HROrg),
+    HROrg_logavg = log(mean(HROrg)),
+    HROrg_median = median(HROrg, na.rm = TRUE),
+    HRNH4_avg = mean(HRNH4),
+    HRNH4_logavg = log(mean(HRNH4)),
+    HRNH4_median = median(HRNH4, na.rm = TRUE),
+    HRSO4_avg = mean(HRSO4),
+    HRSO4_logavg = log(mean(HRSO4)),
+    HRSO4_median = median(HRSO4, na.rm = TRUE),
+    HRNO3_avg = mean(HRNO3),
+    HRNO3_logavg = log(mean(HRNO3)),
+    HRNO3_median = median(HRNO3, na.rm = TRUE),
+    HRChl_avg = mean(HRChl),
+    HRChl_logavg = log(mean(HRChl)),
+    HRChl_median = median(HRChl, na.rm = TRUE),
+    HROrg44_avg = mean(HROrg44),
+    HROrg44_logavg = log(mean(HROrg44)),
+    HROrg44_median = median(HROrg44, na.rm = TRUE),
+    HROrg55_avg = mean(HROrg55),
+    HROrg55_logavg = log(mean(HROrg55)),
+    HROrg55_median = median(HROrg55, na.rm = TRUE),
+    C4H7_avg = mean(C4H7),
+    C4H7_logavg = log(mean(C4H7)),
+    C4H7_median = median(C4H7, na.rm = TRUE),
+    HROrg57_avg = mean(HROrg57),
+    HROrg57_logavg = log(mean(HROrg57)),
+    HROrg57_median = median(HROrg57, na.rm = TRUE),
+    C4H9_avg = mean(C4H9),
+    C4H9_logavg = log(mean(C4H9)),
+    C4H9_median = median(C4H9, na.rm = TRUE),
+    C6H10O_avg = mean(C6H10O),
+    C6H10O_logavg = log(mean(C6H10O)),
+    C6H10O_median = median(C6H10O, na.rm = TRUE),
+    H_C_avg = mean(H_C),
+    H_C_logavg = log(mean(H_C)),
+    H_C_median = median(H_C, na.rm = TRUE),
+    O_C_avg = mean(O_C),
+    O_C_logavg = log(mean(O_C)),
+    O_C_median = median(O_C, na.rm = TRUE),
+    SVOOA_avg = mean(SVOOA),
+    SVOOA_logavg = log(mean(SVOOA)),
+    SVOOA_median = median(SVOOA, na.rm = TRUE),
+    COA_avg = mean(COA),
+    COA_logavg = log(mean(COA)),
+    COA_median = median(COA, na.rm = TRUE),
+    COA_bgRem_avg = mean(COA_bgRemoved),
+    COA_bgRem_logavg = log(mean(COA_bgRemoved)),
+    COA_bgRem_median = median(COA_bgRemoved, na.rm = TRUE),
+    HOA_avg = mean(HOA),
+    HOA_logavg = log(mean(HOA)),
+    HOA_median = median(HOA, na.rm = TRUE),
+    HOA_bgRem_avg = mean(HOA_bgRemoved),
+    HOA_bgRem_logavg = log(mean(HOA_bgRemoved)),
+    HOA_bgRem_median = median(HOA_bgRemoved, na.rm = TRUE),
+    NRPM1_avg = mean(NRPM1),
+    NRPM1_logavg = log(mean(NRPM1)),
+    NRPM1_median = median(NRPM1, na.rm = TRUE),
+    PM25ref_avg = mean(PM25ref),
+    PM25ref_logavg = log(mean(PM25ref)),
+    PM25ref_median = median(PM25ref, na.rm = TRUE),
+    PM25ref_smth_avg = mean(PM25ref_smth),
+    PM25ref_smth_logavg = log(mean(PM25ref_smth)),
+    PM25ref_smth_median = median(PM25ref_smth, na.rm = TRUE),
+    PM25ref_smth_med_avg = mean(PM25ref_smth_med),
+    PM25ref_smth_med_logavg = log(mean(PM25ref_smth_med)),
+    PM25ref_smth_med_median = median(PM25ref_smth_med, na.rm = TRUE),
+    BCref_avg = mean(BCref),
+    BCref_logavg = log(mean(BCref)),
+    BCref_median = median(BCref, na.rm = TRUE),
+    LaneyPM25ref_avg = mean(LaneyPM25ref),
+    LaneyPM25ref_logavg = log(mean(LaneyPM25ref)),
+    LaneyPM25ref_median = median(LaneyPM25ref, na.rm = TRUE),
+    LaneyPM25ref_smth_avg = mean(LaneyPM25ref_smth),
+    LaneyPM25ref_smth_logavg = log(mean(LaneyPM25ref_smth)),
+    LaneyPM25ref_smth_median = median(LaneyPM25ref_smth, na.rm = TRUE),
+    LaneyPM25ref_smth_med_avg = mean(LaneyPM25ref_smth_med),
+    LaneyPM25ref_smth_med_logavg = log(mean(LaneyPM25ref_smth_med)),
+    LaneyPM25ref_smth_med_median = median(LaneyPM25ref_smth_med, na.rm = TRUE)
+  )
+
+# 3. Lunch
+MobileGroup2_df <- filter(Mobile_df, Group == 2)
+GroupedDriveDayGroup2_df <- MobileGroup2_df %>%
+  group_by(datesOnly, NEAR_FID) %>% 
+  summarize(count = n(),
+            Latitude = mean(Latitude),
+            Longitude = mean(Longitude),
+            Polygon = first(Polygon),
+            BigPolygon = first(BigPolygon),
+            hourMean = mean(hourOnly),
+            hourMax = max(hourOnly),
+            hourMin = min(hourOnly),
+            CO_20sMean = mean(CO_20sMean),
+            CO2_20sMea = mean(CO2_20sMea),
+            PN_20sMean = mean(PN_20sMean),
+            HROrg = mean(HROrg),
+            HRNH4 = mean(HRNH4),
+            HRSO4 = mean(HRSO4),
+            HRNO3 = mean(HRNO3),
+            HRChl = mean(HRChl),
+            HROrg44 = mean(HROrg44),
+            HROrg55 = mean(HROrg55),
+            C4H7 = mean(C4H7),
+            HROrg57 = mean(HROrg57),
+            C4H9 = mean(C4H9),
+            C6H10O = mean(C6H10O),
+            H_C = mean(H_C),
+            O_C = mean(O_C),
+            SVOOA = mean(SVOOA),
+            COA = mean(COA),
+            COA_bgRemoved = mean(COA_bgRemoved),
+            HOA = mean(HOA),
+            HOA_bgRemoved = mean(HOA_bgRemoved),
+            NRPM1 = mean(NRPM1),
+            PM25ref = mean(PM25ref),
+            BCref = mean(BCref),
+            LaneyPM25ref = mean(LaneyPM25ref),
+            PM25ref_smth = mean(PM25ref_smth),
+            LaneyPM25ref_smth = mean(LaneyPM25ref_smth),
+            PM25ref_smth_med = mean(PM25ref_smth_med),
+            LaneyPM25ref_smth_med = mean(LaneyPM25ref_smth_med)
+  )
+
+DriveDayGroup2_df <- GroupedDriveDayGroup2_df %>%
+  group_by(NEAR_FID) %>%
+  summarise(
+    count = n(), 
+    Latitude = mean(Latitude),
+    Longitude = mean(Longitude),
+    hour_Avg = mean(hourMean),
+    hour_Med = median(hourMean),
+    Polygon = first(Polygon),
+    BigPolygon = first(BigPolygon),
+    CO_20sMean_avg = mean(CO_20sMean),
+    CO_20sMean_logavg = log(mean(CO_20sMean)),
+    CO_20sMean_median = median(CO_20sMean, na.rm = TRUE),
+    CO2_20sMea_avg = mean(CO2_20sMea),
+    CO2_20sMea_logavg = log(mean(CO2_20sMea)),
+    CO2_20sMea_median = median(CO2_20sMea, na.rm = TRUE),
+    PN_20sMean_avg = mean(PN_20sMean),
+    PN_20sMean_logavg = log(mean(PN_20sMean)),
+    PN_20sMean_median = median(PN_20sMean, na.rm = TRUE),
+    HROrg_avg = mean(HROrg),
+    HROrg_logavg = log(mean(HROrg)),
+    HROrg_median = median(HROrg, na.rm = TRUE),
+    HRNH4_avg = mean(HRNH4),
+    HRNH4_logavg = log(mean(HRNH4)),
+    HRNH4_median = median(HRNH4, na.rm = TRUE),
+    HRSO4_avg = mean(HRSO4),
+    HRSO4_logavg = log(mean(HRSO4)),
+    HRSO4_median = median(HRSO4, na.rm = TRUE),
+    HRNO3_avg = mean(HRNO3),
+    HRNO3_logavg = log(mean(HRNO3)),
+    HRNO3_median = median(HRNO3, na.rm = TRUE),
+    HRChl_avg = mean(HRChl),
+    HRChl_logavg = log(mean(HRChl)),
+    HRChl_median = median(HRChl, na.rm = TRUE),
+    HROrg44_avg = mean(HROrg44),
+    HROrg44_logavg = log(mean(HROrg44)),
+    HROrg44_median = median(HROrg44, na.rm = TRUE),
+    HROrg55_avg = mean(HROrg55),
+    HROrg55_logavg = log(mean(HROrg55)),
+    HROrg55_median = median(HROrg55, na.rm = TRUE),
+    C4H7_avg = mean(C4H7),
+    C4H7_logavg = log(mean(C4H7)),
+    C4H7_median = median(C4H7, na.rm = TRUE),
+    HROrg57_avg = mean(HROrg57),
+    HROrg57_logavg = log(mean(HROrg57)),
+    HROrg57_median = median(HROrg57, na.rm = TRUE),
+    C4H9_avg = mean(C4H9),
+    C4H9_logavg = log(mean(C4H9)),
+    C4H9_median = median(C4H9, na.rm = TRUE),
+    C6H10O_avg = mean(C6H10O),
+    C6H10O_logavg = log(mean(C6H10O)),
+    C6H10O_median = median(C6H10O, na.rm = TRUE),
+    H_C_avg = mean(H_C),
+    H_C_logavg = log(mean(H_C)),
+    H_C_median = median(H_C, na.rm = TRUE),
+    O_C_avg = mean(O_C),
+    O_C_logavg = log(mean(O_C)),
+    O_C_median = median(O_C, na.rm = TRUE),
+    SVOOA_avg = mean(SVOOA),
+    SVOOA_logavg = log(mean(SVOOA)),
+    SVOOA_median = median(SVOOA, na.rm = TRUE),
+    COA_avg = mean(COA),
+    COA_logavg = log(mean(COA)),
+    COA_median = median(COA, na.rm = TRUE),
+    COA_bgRem_avg = mean(COA_bgRemoved),
+    COA_bgRem_logavg = log(mean(COA_bgRemoved)),
+    COA_bgRem_median = median(COA_bgRemoved, na.rm = TRUE),
+    HOA_avg = mean(HOA),
+    HOA_logavg = log(mean(HOA)),
+    HOA_median = median(HOA, na.rm = TRUE),
+    HOA_bgRem_avg = mean(HOA_bgRemoved),
+    HOA_bgRem_logavg = log(mean(HOA_bgRemoved)),
+    HOA_bgRem_median = median(HOA_bgRemoved, na.rm = TRUE),
+    NRPM1_avg = mean(NRPM1),
+    NRPM1_logavg = log(mean(NRPM1)),
+    NRPM1_median = median(NRPM1, na.rm = TRUE),
+    PM25ref_avg = mean(PM25ref),
+    PM25ref_logavg = log(mean(PM25ref)),
+    PM25ref_median = median(PM25ref, na.rm = TRUE),
+    PM25ref_smth_avg = mean(PM25ref_smth),
+    PM25ref_smth_logavg = log(mean(PM25ref_smth)),
+    PM25ref_smth_median = median(PM25ref_smth, na.rm = TRUE),
+    PM25ref_smth_med_avg = mean(PM25ref_smth_med),
+    PM25ref_smth_med_logavg = log(mean(PM25ref_smth_med)),
+    PM25ref_smth_med_median = median(PM25ref_smth_med, na.rm = TRUE),
+    BCref_avg = mean(BCref),
+    BCref_logavg = log(mean(BCref)),
+    BCref_median = median(BCref, na.rm = TRUE),
+    LaneyPM25ref_avg = mean(LaneyPM25ref),
+    LaneyPM25ref_logavg = log(mean(LaneyPM25ref)),
+    LaneyPM25ref_median = median(LaneyPM25ref, na.rm = TRUE),
+    LaneyPM25ref_smth_avg = mean(LaneyPM25ref_smth),
+    LaneyPM25ref_smth_logavg = log(mean(LaneyPM25ref_smth)),
+    LaneyPM25ref_smth_median = median(LaneyPM25ref_smth, na.rm = TRUE),
+    LaneyPM25ref_smth_med_avg = mean(LaneyPM25ref_smth_med),
+    LaneyPM25ref_smth_med_logavg = log(mean(LaneyPM25ref_smth_med)),
+    LaneyPM25ref_smth_med_median = median(LaneyPM25ref_smth_med, na.rm = TRUE)
+  )
+
+# 4. Afternoon
+MobileGroup3_df <- filter(Mobile_df, Group == 3)
+GroupedDriveDayGroup3_df <- MobileGroup3_df %>%
+  group_by(datesOnly, NEAR_FID) %>% 
+  summarize(count = n(),
+            Latitude = mean(Latitude),
+            Longitude = mean(Longitude),
+            Polygon = first(Polygon),
+            BigPolygon = first(BigPolygon),
+            hourMean = mean(hourOnly),
+            hourMax = max(hourOnly),
+            hourMin = min(hourOnly),
+            CO_20sMean = mean(CO_20sMean),
+            CO2_20sMea = mean(CO2_20sMea),
+            PN_20sMean = mean(PN_20sMean),
+            HROrg = mean(HROrg),
+            HRNH4 = mean(HRNH4),
+            HRSO4 = mean(HRSO4),
+            HRNO3 = mean(HRNO3),
+            HRChl = mean(HRChl),
+            HROrg44 = mean(HROrg44),
+            HROrg55 = mean(HROrg55),
+            C4H7 = mean(C4H7),
+            HROrg57 = mean(HROrg57),
+            C4H9 = mean(C4H9),
+            C6H10O = mean(C6H10O),
+            H_C = mean(H_C),
+            O_C = mean(O_C),
+            SVOOA = mean(SVOOA),
+            COA = mean(COA),
+            COA_bgRemoved = mean(COA_bgRemoved),
+            HOA = mean(HOA),
+            HOA_bgRemoved = mean(HOA_bgRemoved),
+            NRPM1 = mean(NRPM1),
+            PM25ref = mean(PM25ref),
+            BCref = mean(BCref),
+            LaneyPM25ref = mean(LaneyPM25ref),
+            PM25ref_smth = mean(PM25ref_smth),
+            LaneyPM25ref_smth = mean(LaneyPM25ref_smth),
+            PM25ref_smth_med = mean(PM25ref_smth_med),
+            LaneyPM25ref_smth_med = mean(LaneyPM25ref_smth_med)
+  )
+
+DriveDayGroup3_df <- GroupedDriveDayGroup3_df %>%
+  group_by(NEAR_FID) %>%
+  summarise(
+    count = n(), 
+    Latitude = mean(Latitude),
+    Longitude = mean(Longitude),
+    hour_Avg = mean(hourMean),
+    hour_Med = median(hourMean),
+    Polygon = first(Polygon),
+    BigPolygon = first(BigPolygon),
+    CO_20sMean_avg = mean(CO_20sMean),
+    CO_20sMean_logavg = log(mean(CO_20sMean)),
+    CO_20sMean_median = median(CO_20sMean, na.rm = TRUE),
+    CO2_20sMea_avg = mean(CO2_20sMea),
+    CO2_20sMea_logavg = log(mean(CO2_20sMea)),
+    CO2_20sMea_median = median(CO2_20sMea, na.rm = TRUE),
+    PN_20sMean_avg = mean(PN_20sMean),
+    PN_20sMean_logavg = log(mean(PN_20sMean)),
+    PN_20sMean_median = median(PN_20sMean, na.rm = TRUE),
+    HROrg_avg = mean(HROrg),
+    HROrg_logavg = log(mean(HROrg)),
+    HROrg_median = median(HROrg, na.rm = TRUE),
+    HRNH4_avg = mean(HRNH4),
+    HRNH4_logavg = log(mean(HRNH4)),
+    HRNH4_median = median(HRNH4, na.rm = TRUE),
+    HRSO4_avg = mean(HRSO4),
+    HRSO4_logavg = log(mean(HRSO4)),
+    HRSO4_median = median(HRSO4, na.rm = TRUE),
+    HRNO3_avg = mean(HRNO3),
+    HRNO3_logavg = log(mean(HRNO3)),
+    HRNO3_median = median(HRNO3, na.rm = TRUE),
+    HRChl_avg = mean(HRChl),
+    HRChl_logavg = log(mean(HRChl)),
+    HRChl_median = median(HRChl, na.rm = TRUE),
+    HROrg44_avg = mean(HROrg44),
+    HROrg44_logavg = log(mean(HROrg44)),
+    HROrg44_median = median(HROrg44, na.rm = TRUE),
+    HROrg55_avg = mean(HROrg55),
+    HROrg55_logavg = log(mean(HROrg55)),
+    HROrg55_median = median(HROrg55, na.rm = TRUE),
+    C4H7_avg = mean(C4H7),
+    C4H7_logavg = log(mean(C4H7)),
+    C4H7_median = median(C4H7, na.rm = TRUE),
+    HROrg57_avg = mean(HROrg57),
+    HROrg57_logavg = log(mean(HROrg57)),
+    HROrg57_median = median(HROrg57, na.rm = TRUE),
+    C4H9_avg = mean(C4H9),
+    C4H9_logavg = log(mean(C4H9)),
+    C4H9_median = median(C4H9, na.rm = TRUE),
+    C6H10O_avg = mean(C6H10O),
+    C6H10O_logavg = log(mean(C6H10O)),
+    C6H10O_median = median(C6H10O, na.rm = TRUE),
+    H_C_avg = mean(H_C),
+    H_C_logavg = log(mean(H_C)),
+    H_C_median = median(H_C, na.rm = TRUE),
+    O_C_avg = mean(O_C),
+    O_C_logavg = log(mean(O_C)),
+    O_C_median = median(O_C, na.rm = TRUE),
+    SVOOA_avg = mean(SVOOA),
+    SVOOA_logavg = log(mean(SVOOA)),
+    SVOOA_median = median(SVOOA, na.rm = TRUE),
+    COA_avg = mean(COA),
+    COA_logavg = log(mean(COA)),
+    COA_median = median(COA, na.rm = TRUE),
+    COA_bgRem_avg = mean(COA_bgRemoved),
+    COA_bgRem_logavg = log(mean(COA_bgRemoved)),
+    COA_bgRem_median = median(COA_bgRemoved, na.rm = TRUE),
+    HOA_avg = mean(HOA),
+    HOA_logavg = log(mean(HOA)),
+    HOA_median = median(HOA, na.rm = TRUE),
+    HOA_bgRem_avg = mean(HOA_bgRemoved),
+    HOA_bgRem_logavg = log(mean(HOA_bgRemoved)),
+    HOA_bgRem_median = median(HOA_bgRemoved, na.rm = TRUE),
+    NRPM1_avg = mean(NRPM1),
+    NRPM1_logavg = log(mean(NRPM1)),
+    NRPM1_median = median(NRPM1, na.rm = TRUE),
+    PM25ref_avg = mean(PM25ref),
+    PM25ref_logavg = log(mean(PM25ref)),
+    PM25ref_median = median(PM25ref, na.rm = TRUE),
+    PM25ref_smth_avg = mean(PM25ref_smth),
+    PM25ref_smth_logavg = log(mean(PM25ref_smth)),
+    PM25ref_smth_median = median(PM25ref_smth, na.rm = TRUE),
+    PM25ref_smth_med_avg = mean(PM25ref_smth_med),
+    PM25ref_smth_med_logavg = log(mean(PM25ref_smth_med)),
+    PM25ref_smth_med_median = median(PM25ref_smth_med, na.rm = TRUE),
+    BCref_avg = mean(BCref),
+    BCref_logavg = log(mean(BCref)),
+    BCref_median = median(BCref, na.rm = TRUE),
+    LaneyPM25ref_avg = mean(LaneyPM25ref),
+    LaneyPM25ref_logavg = log(mean(LaneyPM25ref)),
+    LaneyPM25ref_median = median(LaneyPM25ref, na.rm = TRUE),
+    LaneyPM25ref_smth_avg = mean(LaneyPM25ref_smth),
+    LaneyPM25ref_smth_logavg = log(mean(LaneyPM25ref_smth)),
+    LaneyPM25ref_smth_median = median(LaneyPM25ref_smth, na.rm = TRUE),
+    LaneyPM25ref_smth_med_avg = mean(LaneyPM25ref_smth_med),
+    LaneyPM25ref_smth_med_logavg = log(mean(LaneyPM25ref_smth_med)),
+    LaneyPM25ref_smth_med_median = median(LaneyPM25ref_smth_med, na.rm = TRUE)
+  )
+
+
+
+
+
+
+
+# STARTING WITH READY INPUTS #
+#### LUR inputs ####
+# rm(df_LUR_input,df_LUR_input_test,df_LUR_output)
+  
+  df_LUR_input <- DriveDayFull_df #which starting dataframe to use #EDIT#
+  # df_LUR_input <- DriveDayGroup2_df #which starting dataframe to use #EDIT#
+  remove <- "HRChl"
+  measurementSpeciesforModel <- "COA"
+  measurementSpeciesforModel <- measurementSpeciesforModel [! measurementSpeciesforModel %in% remove]
+  measurementSpeciesforModel
+  measurementSpeciesforModel_stat <- paste(measurementSpeciesforModel, "_median", sep = "") #which species building the model for #EDIT#
+  # measurementSpeciesforModel_stat <- paste(measurementSpeciesforModel, "_logavg", sep = "") #which species building the model for #EDIT#
+  AddSpeciesAsDVs <- c("SVOOA_median","HOA_median")
+  IndepVarsforModel <- c(FullListGISVars) #which IVs are you using for fitting #EDIT#
+  alwaysKeep_DV = c("count","Polygon", "BigPolygon","Latitude", "Longitude", "NEAR_FID",BackgroundMonitor_JustWOakLaney)
+  alwaysKeep_IV = c("NEAR_FID")
+  df_LUR_input <- subset(df_LUR_input, select = c(measurementSpeciesforModel_stat,alwaysKeep_DV))
+  Sites_df_temp <- subset(Sites_df, select = c(IndepVarsforModel,alwaysKeep_IV))
+  Sites_df_temp <- merge(Sites_df_temp, subset(DriveDayFull_df, select = c(AddSpeciesAsDVs,"NEAR_FID")), by = "NEAR_FID")
+  df_LUR_input <- merge(df_LUR_input, Sites_df_temp, by = "NEAR_FID") #dataframe is pre-filtered for DDs, contains list of meas. and IVs
+  IndepVarsforModel <- c(IndepVarsforModel, BackgroundMonitor_JustWOakLaney,AddSpeciesAsDVs)
+  rm(Sites_df_temp)
+  #EDIT#
+  
+  stepSeq <- seq(from = 0.1, to = 1, by = 0.1)
+  tots = 40
+  repeats <- seq(from = 1, to = tots, by = 1)
+  r2saves_goodMods <- r2saves_goodMods[0, ]
+for(rep in repeats){
+  seq = 0.5
+# for(seq in stepSeq){
+  reps = 1
+  drivedays = 15
+  df_LUR_input <- filter(df_LUR_input, count >= drivedays) #run this line to make starting point the 394 sites with drive days >15
+  df_LUR_input <- df_LUR_input[ ,colnames(unique(as.matrix(df_LUR_input), MARGIN=2))] #deal with columns that, for the subset, are identical
+  IndepVarsforModel <- Reduce(intersect, list(IndepVarsforModel, colnames(df_LUR_input))) #same as line above
+  sites = round(nrow(filter(df_LUR_input, count >= drivedays)) * seq) ##change equality if need be
+  saveString = "FullListGISVars"
+#### RUN LUR CODE ####
+              r2results <- replicate(reps, 
+                              run_LUR_all(df_LUR_input, 
+                                          drivedays, 
+                                          IndepVarsforModel, 
+                                          measurementSpeciesforModel_stat, 
+                                          measurementSpeciesforModel_stat, 
+                                          sites, 
+                                          saveString)
+                                      )
+  
+#### Match modeled conc. with sites, store in matrix ####
+df_LUR_output <- merge(df_LUR_output, Polygon_df, by = "NEAR_FID")
+df_LUR_input_wModel <- df_LUR_input
+for(ind in 1:length(measurementSpeciesforModel)){
+  print(paste("R2",AQmodels_sub[[ind]]$summary$r.squared,sep = " "))
+  formula = formula(AQmodels_sub[[ind]])
+  model = lm(formula, data = df_LUR_output)
+  print(formula)
+  print(seq)
+  df_LUR_output[paste(measurementSpeciesforModel_stat[ind], "model", sep = "_")] <- predict(model, data = df_LUR_output)
+  df_LUR_output[paste(measurementSpeciesforModel_stat[ind], "resid", sep = "_")] <- AQmodels_sub[[ind]]$summary$residuals
+  df_LUR_input_wModel[paste(measurementSpeciesforModel_stat[ind], "model", sep = "_")] <- predict(model, df_LUR_input_wModel)
+}
+
+
+# #### include looking at repeats for sub-sampled situations (e.g. only using 40 sites)
+r2contributions_100xrepeats <-calcRelaImp_ESR(ind = 1, data = df_LUR_output)
+shrt <- r2contributions_100xrepeats
+
+tempdf <- data.frame(variable = character(length(names(shrt))),
+                     r2contrib = numeric(length(names(shrt))),
+                     modelNum = numeric(length(names(shrt))),
+                     r2tot = numeric(length(names(shrt))))
+tempdf$variable <- names(shrt)
+tempdf$r2contrib <- as.numeric(shrt)
+tempdf$modelNum <- rep
+tempdf$r2tot <- sum(as.numeric(shrt))
+r2saves_goodMods <- rbind(r2saves_goodMods,tempdf)
+print(paste('done',rep,'...',sep=" "))
+}
+
+####r2 contributions---looking at stable models for low number of sites solutions
+ggplot(r2saves_goodMods, aes(reorder(modelNum, -r2tot))) +
+geom_bar(aes(weight = r2contrib, fill = variable), color = "black") +
+geom_hline(yintercept = 0.5, linetype = 2 , color, size) +
+geom_hline(yintercept = 0.75, linetype = 2 , color, size) +
+# scale_fill_manual(values = c("RestCount_100m" = "#E08214", "RestCount_250m" = "#E08214")) +
+xlab("Models") +
+ylab("R squared")
++ coord_flip()
+
+  
+# df_LUR_input_wModel_logs <- as.data.frame(df_LUR_input$NEAR_FID)
+# df_LUR_input_wModel_logs$Latitude <- df_LUR_input$Latitude
+# df_LUR_input_wModel_logs$Longitude <- df_LUR_input$Longitude
+# df_LUR_output_logs <- as.data.frame(df_LUR_output$NEAR_FID)
+# df_LUR_output_logs$Latitude <- df_LUR_output$Latitude
+# df_LUR_output_logs$Longitude <- df_LUR_output$Longitude
+# for(ind in 1:length(measurementSpeciesforModel)){
+#   print(measurementSpeciesforModel[ind])
+#   print(paste("R2",AQmodels_sub[[ind]]$summary$r.squared,sep = " "))
+#   formula = formula(AQmodels_sub[[ind]])
+#   model = lm(formula, data = df_LUR_output)
+#   df_LUR_output_logs[paste(measurementSpeciesforModel_stat[ind], "model", sep = "_")] <- predict(model, data = df_LUR_output)
+#   df_LUR_output_logs[paste(measurementSpeciesforModel_stat[ind], sep = "")] <- df_LUR_output[measurementSpeciesforModel_stat[ind]]
+#   df_LUR_output_logs[paste(measurementSpeciesforModel_stat[ind], sep = "modelLogXform")] <- exp(predict(model, df_LUR_output))
+#   df_LUR_output_logs[paste(measurementSpeciesforModel_stat[ind], sep = "measLogXform")] <- exp(df_LUR_output[measurementSpeciesforModel_stat[ind]])
+#   df_LUR_input_wModel_logs[paste(measurementSpeciesforModel_stat[ind], "modelLogXform", sep = "_")] <- exp(predict(model, df_LUR_input_wModel))
+#   df_LUR_input_wModel_logs[paste(measurementSpeciesforModel_stat[ind], "measLogXform", sep = "_")] <- exp(df_LUR_input_wModel[measurementSpeciesforModel_stat[ind]])
+# }
+# 
+# ggplot(df_LUR_output_logs) + geom_point(aes(x = COA_logavg, y= COA_logavg_model)) +
+#   coord_cartesian(ylim = c(0,4), xlim = c(0,4))
+
+
+
+#### Saving R2 results to a dataframe #####
+prepR2SaveDf <- function(){
+  r2results <- aperm(r2results)
+  rsquaredDf <- data.frame(r2results, stringsAsFactors = FALSE)
+  colnames(rsquaredDf) <- c(measurementSpeciesforModel_stat,"DriveDays","NumSites",paste(measurementSpeciesforModel_stat,"RSE",sep="_"),"InputIVList")
+  # colnames(rsquaredDf) <- c(measurementSpeciesforModel_stat,"DriveDays","NumSites","InputIVList")
+  rsquaredDf
+} #functions for building an r2 results dataframe
+appendR2SaveDf <- function(){
+  r2bigtemp <- R2_save_df
+  r2results <- aperm(r2results)
+  rsquaredDf <- data.frame(r2results, stringsAsFactors = FALSE)
+  # colnames(rsquaredDf) <- c(measurementSpeciesforModel_stat,"DriveDays","NumSites","InputIVList")
+  colnames(rsquaredDf) <- c(measurementSpeciesforModel_stat,"DriveDays","NumSites",paste(measurementSpeciesforModel_stat,"RSE",sep="_"),"InputIVList")
+  rsquaredDf <- rbind(rsquaredDf,r2bigtemp)
+  rsquaredDf
+} #functions for building an r2 results dataframe
+if(exists("R2_save_df") == FALSE){
+   R2_save_df <- prepR2SaveDf()
+   temp1 <- subset(R2_save_df, select=-c(InputIVList))
+   temp2 <- subset(R2_save_df, select=c(InputIVList))
+   temp1 %>% map_if(is.factor, as.character) %>% map_if(is.character, as.numeric) %>% as_data_frame -> temp1 
+   temp2 %>% map_if(is.factor, as.character) %>% as_data_frame -> temp2 
+   R2_save_df <- cbind(temp1,temp2)
+} else {
+    R2_save_df <- appendR2SaveDf()
+    temp1 <- subset(R2_save_df, select=-c(InputIVList))
+    temp2 <- subset(R2_save_df, select=c(InputIVList))
+    temp1 %>% map_if(is.factor, as.character) %>% map_if(is.character, as.numeric) %>% as_data_frame -> temp1 
+    temp2 %>% map_if(is.factor, as.character) %>% as_data_frame -> temp2 
+    R2_save_df <- cbind(temp1,temp2)
+}
+
+}
+
+####Data frame cleaning####
+  
+  ####RUN LUR MODELS####
+  #FinalDVList <- 
+  #FinalIVList <- 
+  
+  ####Model validation stuf####
+  
+    
+######PLOTS - ALL PLOTS NEED TO BE WRITTEN AS FUNCTIONS!!!!######
+mapPlotfunc <- function(variable, df = df_LUR_input_wModel, Str = "testSave2"){
+    myLocation2 <- c((median(df[["Longitude"]])-0.01), (median(df[["Latitude"]])+0.003))
+    lon_range <- extendrange( df[["Longitude"]] )
+    lat_range <- extendrange( df[["Latitude"]] )
+    calc <- calc_zoom(lon_range, lat_range)
+    routemap <- get_map(location = myLocation2, source = "google", maptype = "terrain", zoom = calc - 0)
+    mapPlot <<- ggmap(routemap) +
+      geom_point(data = df,
+                 aes(x = Longitude, y = Latitude),
+                 alpha = 0, size = 3) +
+      geom_point(data = df,
+                 aes_string(x = "Longitude", y = "Latitude",
+                            fill = variable), size = 3, shape = 21, stroke =1) +
+      # scale_colour_gradient(colours = yellow2red(10), limits = c(0,1)) +
+      # scale_colour_manual(colours = matlab.like2(10), limits = c(0,3)) +#, limits = c(0,15)) +
+     scale_fill_gradient2(low = "white",#, mid = "white",
+                           high = "blue", midpoint = 0, limits = c(0,1), na.value = "green") +
+      ggtitle(Str)
+    print(mapPlot)
+    date <- format(Sys.Date(), format = "%Y%m%d")
+    saveStr <- c("Map_",variable,"_",Str,"_",date,".pdf")
+    saveStr <- paste(saveStr,collapse="")
+    ggsave(paste(getwd(),"plots",saveStr, sep = "/"), width = 7, height = 7)
+  }
+  mapPlotfunc("HOA_bgRem_avg", df = df_LUR_output, Str = "HOA_bgRem_avg")
+  map(paste(measurementSpeciesforModel_stat,"",sep=""), mapPlotfunc)
+###
+scatterPlot_measVsmodel_func <- function(variable, df = df_LUR_output, Str = "LowDDsHighR2"){
+  grabMax <- max(df[[variable]],df[[paste(variable,"_model",sep="")]])
+  print(grabMax)
+  
+  scatterPlot_measVsmodel <<- ggplot(data = df) +
+                              geom_point(aes_string(x = variable, y = paste(variable,"_model",sep = ""))) +
+                              geom_smooth(aes_string(x = variable, y = paste(variable,"_model",sep = "")), method='lm', se=FALSE) +
+                              coord_cartesian(ylim = c(0,grabMax), xlim = c(0,grabMax)) +
+                              geom_abline(intercept = 0, slope = 1) +
+                              
+                              theme_bw() +
+                              ggtitle(paste(variable,Str,sep="_"))
+  
+  print(scatterPlot_measVsmodel)
+  date <- format(Sys.Date(), format = "%Y%m%d")
+  saveStr <- c("Scat_MeasVModel_",variable,"_",Str,"_",date,".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  ggsave(paste(getwd(),"plots",saveStr, sep = "/"))
+}
+scatterPlot_measVsmodel_func("COA_bgRem_avg", df_LUR_output, "bgRem")
+map(measurementSpeciesforModel_stat, scatterPlot_measVsmodel_func)
+###
+plotByPolygon_func <- function(variable, df = df_LUR_output, Str = "Full15DDs"){
+    grabMax <- max(df[[variable]],df[[paste(variable,"_model",sep="")]])
+    plotByPolygon <<- ggplot(data = df) +
+    geom_violin(aes_string(group = "Polygon", x = "Polygon", y = variable)) +
+    geom_jitter(aes_string(x = "Polygon", y = variable),
+                height = NULL, width = 0.08, shape = 21, alpha = 0.3) +
+    # scale_fill_gradientn(colours = matlab.like2(10)) +
+    labs(y = paste(variable," (ug m-3)",sep="")) +
+    # coord_cartesian(ylim = c(0,grabMax)) +
+      coord_cartesian(ylim = c(0,4.5)) +
+    theme_bw() +
+    theme(axis.line = element_line(color = "black"),
+          axis.text.x = element_text(angle = 90, hjust = 1)) 
+    # ggtitle(paste(variable,Str,sep="_"))
+    
+    print(plotByPolygon)
+    date <- format(Sys.Date(), format = "%Y%m%d")
+    saveStr <- c("PlotByPolygon_",variable,"_",Str,"_",date,".pdf")
+    saveStr <- paste(saveStr,collapse="")
+    ggsave(paste(getwd(),"plots",saveStr, sep = "/"), width = 7, height = 7)
+}
+plotByPolygon_func("HOA_median")
+plotByPolygon_func("COA_median", df_LUR_output, "Full15DDs")
+map(measurementSpeciesforModel_stat, plotByPolygon_func)
+###
+r2byFactor_func <- function(Variable, r2df, Str){
+  
+  meltR2 <<- melt(r2df, measure.vars = measurementSpeciesforModel_stat)
+  r2byFactor <<- ggplot(data = meltR2, aes(y = value, x = as.factor(DriveDays), color = variable)) +
+    geom_boxplot() +
+    scale_y_continuous(limits = c(0,1))+
+    facet_wrap(Variable) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+    print(r2byFactor)
+  
+  date <- format(Sys.Date(), format = "%Y%m%d")
+  saveStr <- c("R2by",Variable,"_",Str,"_",date,".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  ggsave(paste(getwd(),"plots",saveStr, sep = "/"))
+}
+r2byFactor_func("DriveDays",R2_save_df,"")
+
+r2byFactor_oneSpecies_DriveDays <- function(Variable, r2df, oneSpecies, Str){
+  meltR2_oneFact <<- select(r2df,  c(oneSpecies,"DriveDays","NumSites","InputIVList"))
+  meltR2_oneFact <<- melt(meltR2_oneFact, measure.vars = oneSpecies)
+  r2byFactor2_DriveDays <<- ggplot(data = meltR2_oneFact) + 
+    geom_boxplot(aes(y = value, x = as.factor(DriveDays))) +
+    scale_y_continuous(limits = c(0,1))+
+    #facet_wrap(Variable) +
+    theme_classic() +
+    ylab("R-squared") +
+    xlab("Drive-day data points included for each site") +
+    # ggtitle(oneSpecies) + 
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  theme(panel.grid = element_blank(), panel.border = element_blank())
+     print(r2byFactor2_DriveDays)
+
+  date <- format(Sys.Date(), format = "%Y%m%d")
+  saveStr <- c("R2by",Variable,"_",Str,"_",date,".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  ggsave(paste(getwd(),"plots",saveStr, sep = "/"),width = 4.5, height = 3.5)
+}
+r2byFactor_oneSpecies_DriveDays("DriveDays",r2df = R2_save_df, "HOA_75thperc" , "test")
+
+r2byFactor_oneSpecies_NumSites <- function(Variable, r2df, oneSpecies, Str){
+  meltR2_oneFact <<- select_(r2df,  c(oneSpecies,"DriveDays","NumSites","InputIVList"))
+  meltR2_oneFact <<- melt(meltR2_oneFact, measure.vars = oneSpecies)
+  r2byFactor_NumSites <<- ggplot(data = meltR2_oneFact) +#, aes(group = variable)) +
+    geom_boxplot(aes(y = value, x = as.factor(NumSites))) +
+    scale_y_continuous(limits = c(0,1))+
+    #facet_wrap(Variable) +
+    theme_classic() +
+    ylab("R-squared") +
+    xlab("Number of total sites  used for LUR model") +
+    # ggtitle(oneSpecies) +
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+    theme(panel.grid = element_blank(), panel.border = element_blank())
+  print(r2byFactor_NumSites)
+
+  date <- format(Sys.Date(), format = "%Y%m%d")
+  saveStr <- c("R2by",Variable,"_",Str,"_",date,".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  ggsave(paste(getwd(),"plots",saveStr, sep = "/"),width = 4.5, height = 3.5)
+}
+  r2byFactor_oneSpecies_NumSites("NumSites",r2df = R2_save_df_byNumSites, c("COA_median") , "COA_median")
+panelPlot <- grid.arrange(r2byFactor_NumSites, r2byFactor_DriveDays, nrow = 1)
+print(panelPlot)
+ggsave(paste(getwd(),"plots","panelPlot.pdf", sep = "/"),width = 4.5, height = 3.5)
+###
+diurnalPlot_func <- function(variable, df = GroupedDriveDay_df, Str, whichPolygons){
+  subDf4thisPlot <- filter(df, Polygon == whichPolygons)
+  #subDf4thisPlot <- df[df$Polygon == whichPolygons, ]
+  diurnalPlot <<- ggplot(subDf4thisPlot, aes(x = as.factor(round(hourMean)))) + geom_boxplot(aes_string(y = variable)) +
+    coord_cartesian(ylim =  c(0,12)) +
+    labs(x = "Hour of day",
+         y = paste(variable," concentration (ug m-3)",sep="")) +
+    ggtitle(paste(variable,Str,sep="_"))
+  print(diurnalPlot)
+  date <- format(Sys.Date(), format = "%Y%m%d")
+  saveStr <- c("DiurnalByPolygon_",variable,"_",Str,"_",date,".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  ggsave(paste(getwd(),"plots",saveStr, sep = "/"))
+} #original function call (gets redefined in for loop though)
+for(poly in PolygonList){
+  print(poly)
+  diurnalPlot_func <- function(variable, df = GroupedDriveDay_df, Str = poly, whichPolygons = poly){
+    subDf4thisPlot <- df[df$Polygon == whichPolygons, ]
+    diurnalPlot <<- ggplot(subDf4thisPlot, aes(x = as.factor(round(hourMean)))) + geom_boxplot(aes_string(y = variable)) +
+      coord_cartesian(ylim =  c(0,12)) +
+      labs(x = "Hour of day",
+           y = paste(variable," concentration (ug m-3)",sep="")) +
+      ggtitle(paste(variable,Str,sep="_"))
+    print(diurnalPlot)
+    date <- format(Sys.Date(), format = "%Y%m%d")
+    saveStr <- c("DiurnalByPolygon_",variable,"_",Str,"_",date,".pdf")
+    saveStr <- paste(saveStr,collapse="")
+    ggsave(paste(getwd(),"plots",saveStr, sep = "/"))
+  }
+    map(measurementSpeciesforModel, diurnalPlot_func) #loop through each species at each polygon
+}
+
+SiteVariabilityPlot_func <- function(df = df_LUR_output, type = "median",Str){
+    species <- c("HOA","COA","SVOOA","HROrg")
+    speciesType <- paste(species,type,sep = "_")
+    meltDf <<- melt(data = df[ , speciesType], measure.vars = speciesType)
+    SiteVariabilityPlot <<- ggplot(meltDf) + 
+      geom_histogram(aes(x = value, group = variable, fill = variable), binwidth = 0.1) +
+      facet_grid(rows = vars(variable)) + 
+      theme_bw() +
+      ylab("# of sites") +
+      xlab("Concentration (ug m-3)") 
+  print(SiteVariabilityPlot)
+  
+  date <- format(Sys.Date(), format = "%Y%m%d")
+  saveStr <- c("SiteVariability","_",date,".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  ggsave(paste(getwd(),"plots",saveStr, sep = "/"), width = 7, height = 7)
+  
+  
+}
+SiteVariabilityPlot_func()
+###
+#### Write files for output --> ArcMap import ####
+saveDir <- paste(getwd(),"outputForArcMap",sep="/")
+saveDir
+saveFileDf <- df_LUR_input_wModel
+saveFile <- paste("df_LUR_input_wModel",".csv",sep="")
+saveFile
+write.csv(saveFileDf,paste(saveDir,saveFile,sep="/"))
+saveFileDf <- df_LUR_output
+saveFile <- paste("df_LUR_output",".csv",sep="")
+write.csv(saveFileDf,paste(saveDir,saveFile,sep="/"))
+
+saveDir <- paste(getwd(),"outputForArcMap",sep="/")
+saveDir
+saveFileDf <- df_LUR_input_wModel_logs
+saveFile <- paste("df_LUR_input_wModel_logs",".csv",sep="")
+saveFile
+write.csv(saveFileDf,paste(saveDir,saveFile,sep="/"))
+saveFileDf <- df_LUR_output_logs
+saveFile <- paste("df_LUR_output_logs",".csv",sep="")
+write.csv(saveFileDf,paste(saveDir,saveFile,sep="/"))
+
+####Quick ggmap block of Alameda County Blocks? ####
+dir()
+MakePolygonMap <- function(Str){
+  ####Polygon stuff
+QuickSlim <- readOGR(dsn = "shapes", layer = "QuickSlim")
+Port <- readOGR(dsn = "shapes", layer = "Port")
+Downtown <- readOGR(dsn = "shapes", layer = "Downtown")
+Trapezium <- readOGR(dsn = "shapes", layer = "Trapezium")
+Emeryville <- readOGR(dsn = "shapes", layer = "Emeryville")
+LowerSquare <- readOGR(dsn = "shapes", layer = "LowerSquare")
+Belly <- readOGR(dsn = "shapes", layer = "Belly")
+UpperSquare <- readOGR(dsn = "shapes", layer = "UpperSquare")
+UpperSlim <- readOGR(dsn = "shapes", layer = "UpperSlim")
+
+# fortify germany: bundes
+QuickSlimFort <- fortify(QuickSlim)
+PortFort<- fortify(Port)
+DowntownFort<- fortify(Downtown)
+TrapeziumFort<- fortify(Trapezium)
+EmeryvilleFort<- fortify(Emeryville)
+LowerSquareFort<- fortify(LowerSquare)
+BellyFort <- fortify(Belly)
+UpperSquareFort <- fortify(UpperSquare)
+UpperSlimFort <- fortify(UpperSlim)
+####
+middleUpperSquare <- c(median(UpperSquareFort[["long"]]), (median(UpperSquareFort[["lat"]])))
+polygonmap <- get_map(location = middleUpperSquare, source = "google", maptype = "terrain", zoom = 13)
+
+bigPolyDf <- rbind(QuickSlimFort, PortFort, DowntownFort, TrapeziumFort, EmeryvilleFort, LowerSquareFort, BellyFort, UpperSquareFort)
+
+
+
+####
+  fillCol <- "blue"
+  lineCol <- "white"
+  alphaSetting <- 0.3
+  lonBuff <- 0.005
+  latBuff <- 0.013
+  polygonMapPlot <- ggmap(polygonmap) + 
+  geom_polygon(data = QuickSlimFort, aes(x = long, y = lat, group = group), fill = fillCol, col = lineCol, alpha = alphaSetting) + 
+  geom_polygon(data = PortFort, aes(x = long, y = lat, group = group), fill = fillCol, col = lineCol, alpha = alphaSetting) +
+    geom_polygon(data = DowntownFort, aes(x = long, y = lat, group = group), fill = fillCol, col = lineCol, alpha = alphaSetting) +
+    geom_polygon(data = TrapeziumFort, aes(x = long, y = lat, group = group), fill = fillCol, col = lineCol, alpha = alphaSetting) +
+    geom_polygon(data = EmeryvilleFort, aes(x = long, y = lat, group = group), fill = fillCol, col = lineCol, alpha = alphaSetting) +
+    geom_polygon(data = LowerSquareFort, aes(x = long, y = lat, group = group), fill = fillCol, col = lineCol, alpha = alphaSetting) +
+    geom_polygon(data = BellyFort, aes(x = long, y = lat, group = group), fill = fillCol, col = lineCol, alpha = alphaSetting) +
+    geom_polygon(data = UpperSquareFort, aes(x = long, y = lat, group = group), fill = fillCol, col = lineCol, alpha = alphaSetting) +
+    geom_polygon(data = UpperSlimFort, aes(x = long, y = lat, group = group), fill = fillCol, col = lineCol, alpha = alphaSetting) +
+  coord_map(xlim = c(min(bigPolyDf[["long"]]) - lonBuff ,max(bigPolyDf[["long"]]) + lonBuff),
+            ylim = c(min(bigPolyDf[["lat"]]) - latBuff,max(bigPolyDf[["lat"]]) + latBuff)) +
+  theme_nothing()
+  
+  print(polygonMapPlot)
+  
+  date <- format(Sys.Date(), format = "%Y%m%d")
+  saveStr <- c("MapOfPolygons","_",Str,"_",date,".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  ggsave(paste(getwd(),"plots",saveStr, sep = "/"), width = 7, height = 7)
+
+}
+MakePolygonMap("")
+
+
+#### Relative importance to R2 #####
+r2Seq = seq(1,8,1) #each of the species being modeled
+calcRelaImp_ESR <- function(ind, data = df_LUR_output){
+  linmodFunc <- lm(formula = AQmodels_sub[[ind]]$formula, data = data) #'scrape' the regression formula
+  metricsFunc <- calc.relimp(linmodFunc) #this calculates the relative contribution stuff
+  strsplit(AQmodels_sub[[ind]]$formula, split = " ")[[1]][1] #scrape the species name
+  storeFunc <<- metricsFunc@lmg #store the relative contribution numbers themselves
+}
+calcRelaImp_names_ESR <- function(ind, data = df_LUR_output){
+  strsplit(AQmodels_sub[[ind]]$formula, split = " ")[[1]][1]
+}
+
+##run the above two functions over all species
+r2contributions <-map(testSeq, calcRelaImp_ESR)
+r2Names <-map(testSeq, calcRelaImp_names_ESR)
+names(r2contributions) <- r2Names #end up with a properly named list of the r2 contributions for each species
+
+parseListitemsForCats <- function(ind, list = r2contributions){
+        lengthOfModel <- length(list[[ind]])
+        sumRestCat <- 0
+        sumRoadsCat <- 0
+        sumBusCat <- 0
+        sumPopCat <- 0
+        sumPortCat <- 0
+        sumLandCover <- 0
+        sumBackMonCat <- 0
+        sumImpervCat <- 0
+        sumOther <- 0
+        for(jnd in 1:lengthOfModel){
+            test<- names(list[[ind]][jnd])
+            if(test %in% RestCountGISVars){
+              sumRestCat <- sumRestCat + as.numeric(list[[ind]][jnd])
+            } else if (test %in% RoadGISVars) {
+              sumRoadsCat <- sumRoadsCat + as.numeric(list[[ind]][jnd])
+            } else if (test %in% PopGISVars) {
+              sumPopCat <- sumPopCat + as.numeric(list[[ind]][jnd])
+            } else if (test %in% c(VegetationGISVars,NLCDGISVars)) {
+              sumLandCover <- sumLandCover + as.numeric(list[[ind]][jnd])
+            } else if (test %in% BusGISVars) {
+              sumBusCat <- sumBusCat + as.numeric(list[[ind]][jnd])
+            } else if (test %in% PortGISVars) {
+              sumPortCat <- sumPortCat + as.numeric(list[[ind]][jnd])
+            } else if (test %in% BackgroundMonitor_JustWOakLaney) {
+              sumBackMonCat <- sumBackMonCat + as.numeric(list[[ind]][jnd])
+            } else if (test %in% ImperviousGISVars) {
+              sumImpervCat <- sumImpervCat + as.numeric(list[[ind]][jnd])
+
+            } else {
+              sumOther <- sumOther + as.numeric(list[[ind]][jnd])
+            }
+        }
+        list(sumRestCat,sumRoadsCat,sumPopCat,sumLandCover,sumBusCat,sumPortCat,sumImpervCat,sumBackMonCat,sumOther,sum(sumRestCat,sumRoadsCat,sumPopCat,sumLandCover,sumBusCat,sumPortCat,sumImpervCat,sumBackMonCat,sumOther)) 
+}
+
+r2contributionsParsed <- map(r2Seq,parseListitemsForCats)
+names(r2contributionsParsed) <- r2Names
+namesVect <- c("Restaurants","Roads","Population","LandCover","BusRouteDens","Port","Impervious","ReferenceSite","Other","TotalR2")
+makeDataFrameOfR2Contribs <- function(ind, list = r2contributionsParsed){
+  namesVect <- c("Restaurants","Roads","Population","LandCover","BusRouteDens","Port","Impervious","ReferenceSite","Other","TotalR2")
+        vect <- c(r2contributionsParsed[[ind]][[1]],r2contributionsParsed[[ind]][[2]],r2contributionsParsed[[ind]][[3]],r2contributionsParsed[[ind]][[4]],r2contributionsParsed[[ind]][[5]],r2contributionsParsed[[ind]][[6]],r2contributionsParsed[[ind]][[7]],r2contributionsParsed[[ind]][[8]],r2contributionsParsed[[ind]][[9]],r2contributionsParsed[[ind]][[10]])
+        #names(vect) <- namesVect
+        vect
+}
+
+
+for(ind in 1:length(r2Seq)){
+  print(ind)
+  temp <- makeDataFrameOfR2Contribs(ind)
+  if(ind == 1){
+    r2contribs_df <- data.frame(matrix(ncol = 10, nrow = 0))
+    r2contribs_df <- rbind(r2contribs_df,temp)
+  } else {
+    r2contribs_df <- rbind(r2contribs_df,temp)  
+  }
+  colnames(r2contribs_df) <- namesVect
+}
+r2contribs_df$Species <- unlist(r2Names)
+
+###relative contribution plot
+colsFill <- c("Reference Site" = "gold2",
+              "Port"="orangered",
+              "Bus Routes"="purple2",
+              "Restaurants"="dodgerblue3",
+              "Roads"="lightskyblue2",
+              "Population"="chartreuse4",
+              "Other"="black",
+              "Impervious Surfaces"="gray",
+              "Land Cover (NLCD + NDVI)"="green")
+
+
+
+ggplot(data = r2contribs_df) + 
+  # geom_bar(aes(x = as.factor(Species), y = TotalR2, fill= "Other"), stat = "identity") +
+  geom_bar(aes(x = as.factor(Species), y = (Roads + Restaurants + Population + LandCover + BusRouteDens + Port +  Impervious + ReferenceSite), fill = "Reference Site"), stat = "identity") +
+  geom_bar(aes(x = as.factor(Species), y = (Roads + Restaurants + Population + LandCover + BusRouteDens + Port + Impervious), fill = "Impervious Surfaces"), stat = "identity") +
+  geom_bar(aes(x = as.factor(Species), y = (Roads + Restaurants + Population + LandCover + BusRouteDens + Port), fill = "Port"), stat = "identity") +
+  geom_bar(aes(x = as.factor(Species), y = (Roads + Restaurants + Population + LandCover + BusRouteDens), fill = "Bus Routes"), stat = "identity") +
+  geom_bar(aes(x = as.factor(Species), y = (Roads + Restaurants + Population + LandCover), fill = "Land Cover (NLCD + NDVI)"), stat = "identity") +
+  #geom_bar(aes(x = as.factor(Species), y = (Roads + Restaurants + Population), fill = "Population"), stat = "identity") +
+  geom_bar(aes(x = as.factor(Species), y = (Roads + Restaurants), fill = "Restaurants"), stat = "identity") +
+  geom_hline(yintercept = 0.5, linetype = 2 , color, size) +
+  geom_hline(yintercept = 0.75, linetype = 2 , color, size) +
+  annotate("text", x=as.factor("HRNH4_median"), y = 0.62, label = "Acceptable") +
+  annotate("text", x=as.factor("HRNH4_median"), y = 0.87, label = "Good") +
+  #geom_bar(aes(x = as.factor(Species), y = Roads, fill = "Roads"), stat = "identity") +
+  ylab("Relative R2 contribution") +
+  xlab("Species") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 1)) +
+  scale_fill_manual(name="Land use category",values=colsFill) + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+#### Validation stuff (CV, Moran, etc.) #####
+Mod_HOA <- lm(AQmodels_sub[[2]]$formula, df_LUR_input)

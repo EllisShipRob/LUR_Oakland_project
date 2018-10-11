@@ -1,0 +1,568 @@
+##### 1. libraries and source code ####
+install.packages("tidyverse")
+install.packages("car")
+install.packages("ape")
+install.packages("DAAG")
+install.packages("ggmap", type = "source")
+install.packages("ggplot2")
+install.packages("colorRamps")
+devtools::install_github("dkahle/ggmap")
+devtools::install_github("hadley/ggplot2")
+install.packages("BBmisc")
+library(BBmisc)
+library(ggplot2)
+library("scales")
+library(colorRamps)
+library(tidyverse)
+library(car)
+library(ape)
+library(DAAG)
+library(reshape2)
+library(ggmap)
+# load functions
+source('make_lur.R')
+source('run_LUR_all.R')
+
+#####IF NEEDED -- append some covariate data
+# Subsetcovarsfile = "OaklandDdata_allDays.csv"
+# SubDf <- read.csv(Subsetcovarsfile, sep = ",", header = TRUE)
+# dataNoFilt$PM25ref_avg = SubDf$PM25ref_avg
+# dataNoFilt$PM25ref_median = SubDf$PM25ref_median
+# dataNoFilt$PM25ref_smth_avg = SubDf$PM25ref_smth_avg
+# dataNoFilt$PM25ref_smth_median = SubDf$PM25ref_smth_median
+# dataNoFilt$PM25ref_smth_med_avg = SubDf$PM25ref_smth_med_avg
+# dataNoFilt$PM25ref_smth_med_median = SubDf$PM25ref_smth_med_median
+# dataNoFilt$BCref_avg = SubDf$BCref_avg
+# dataNoFilt$BCref_median = SubDf$BCref_median
+# dataNoFilt$LaneyPM25ref_avg = SubDf$LaneyPM25ref_avg
+# dataNoFilt$LaneyPM25ref_median = SubDf$LaneyPM25ref_median
+# dataNoFilt$LaneyPM25ref_smth_avg = SubDf$LaneyPM25ref_smth_avg
+# dataNoFilt$LaneyPM25ref_smth_median = SubDf$LaneyPM25ref_smth_median
+# dataNoFilt$LaneyPM25ref_smth_med_avg = SubDf$LaneyPM25ref_smth_med_avg
+# dataNoFilt$LaneyPM25ref_smth_med_median = SubDf$LaneyPM25ref_smth_med_median
+# 
+# colnames(dataNoFilt)
+# dataNoFilt$LaneyPM25ref_avg[1:10]
+# sum(is.na(dataNoFilt$LaneyPM25ref_avg))
+
+######one time thing, join polygon stuff to DataNoFilt######
+polygonFile = "OaklandDdata_allDays_wPolygons.csv"
+polygondf <- read.csv(polygonFile, sep = ",", header = TRUE)
+colnames(polygondf)
+keepCols <- c("NEAR_FID", "Polygon", "BigPolygon", "count","hour_Avg","hour_Med")
+polygondf <- polygondf[ , keepCols]
+dataNoFilt <- merge(dataNoFilt, polygondf, by = "NEAR_FID")
+
+
+
+
+##### 2. data import and handling ####
+#import big data file
+# dataNoFilt <- read_csv('LURdf2.csv') 
+# dataNoFilt$PM25ref_avg = SubDf$PM25ref_avg
+# dataNoFilt$PM25ref_median = SubDf$PM25ref_median
+# dataNoFilt$BCref_avg = SubDf$BCref_avg
+# dataNoFilt$BCref_median = SubDf$BCref_median
+dataNoFilt$Freshness <- (dataNoFilt$HOA_avg + dataNoFilt$COA_avg) / (dataNoFilt$HOA_avg + dataNoFilt$COA_avg + dataNoFilt$SVOOA_avg)
+dataNoFilt$HOAfrac <- (dataNoFilt$HOA_avg) / (dataNoFilt$HOA_avg + dataNoFilt$COA_avg + dataNoFilt$SVOOA_avg)
+#dataNoFilt <- subset(dataNoFilt, select = -c(Dist2Airport, MinDist2Port))
+#only data with e.g. 15 or more drive days 
+data <- dataNoFilt[dataNoFilt$count >= 10,] 
+
+
+
+
+######make list of subset of DVs to run model for####
+trafficNonAMS = c('CO_20sMean_avg','CO2_20sMean_avg', 'PN_20sMean_avg')
+OAfactors = c('COA_avg', 'HOA_avg', 'SVOOA_avg')
+PM1species = c('HRNO3_avg', 'HRSO4_avg', 'HRChl_avg', 'HROrg_avg', 'HRNH4_avg')
+PM1species_meds = c('HRNO3_median', 'HRSO4_median', 'HRChl_median', 'HROrg_median', 'HRNH4_median')
+OAfactors_meds = c('COA_median', 'HOA_median','SVOOA_median')
+
+dataNoFilt$NRPM1_avg <- rowSums(dataNoFilt[, PM1species ])
+dataNoFilt$NRPM1_median <- rowSums(dataNoFilt[, PM1species_meds ])
+
+DVsmallList = c(OAfactors, PM1species, "NRPM1_avg")
+DVsmallList_meds = c('COA_median', 'HOA_median', 'SVOOA_median','HRNO3_median', 'HRSO4_median', 'HRChl_median', 'HROrg_median', 'HRNH4_median', "NRPM1_median")#, "NRPM1_median")
+DVbigList = c(OAfactors, PM1species, trafficNonAMS)
+
+#cut out the columns you don't want as IVs
+IndepVarsFile = "indepVarlist2.csv" #read in all possible variable names
+IndepVarsList = readLines(IndepVarsFile)
+
+#which columns in the big dataframe are the potential DVs
+DepVarsFile  = "datanames.csv" #read in all possible variable names
+DepVarsList = readLines(DepVarsFile)
+
+
+###### 3. run function #######
+#the replicate ( run_LUR_all ( make_LUR is three functions all working together that:
+#  1. runs Hugh's make_LUR function, but..
+#  2. adapts the make_LUR function for how I've organized the data
+#  3. runs the function N times to look at subsetting the full number of sites, trying to look at model performance
+indexes = seq(11,18,by=1)
+
+for(ind in indexes){
+reps = 1
+drivedays = 10#ind #full list of sites with drivedays >=
+#sites = 80 # number of sites to sample from the total
+sites = nrow(dataNoFilt[dataNoFilt$count >= drivedays ,] )/1 #all sites for a given # of drivedays
+print(sites)
+
+#sample run of func
+r2results <- replicate(
+              reps, 
+                run_LUR_all(
+                      dataNoFilt, drivedays, IndepVarsList, DepVarsList, c(DVsmallList,DVsmallList_meds), sites, "try"
+                            )
+                      )
+r2results <- aperm(r2results)
+rsquaredDf <- data.frame(r2results)
+colnames(rsquaredDf) <- c(DVsmallList_meds,"DriveDays","NumSites")
+#print(rsquaredDf)
+#r2big <- rsquaredDf
+###CAREFUL
+r2bigtemp <-r2big
+r2big <- rbind(rsquaredDf,r2bigtemp)
+r2big_18DDNumSites_eachDriveDay <- r2big
+}
+#r2big_90thpercHROrg <- r2big
+
+######Run RESIDUAL STUFF######
+data_sub$HOAresid <- AQmodels_sub[[11]]$summary$residuals
+dataNoFilt$HOAmodeled <- predict(lm(formula(AQmodels_sub[[11]]), dataNoFilt))
+dataNoFilt$HOAresid <- dataNoFilt$HOA_median - dataNoFilt$HOAmodeled
+datCopy$HOAmodeled <- predict(lm(formula(AQmodels_sub[[11]]), datCopy))
+data_sub$HOAmodeled <- predict(lm(formula(AQmodels_sub[[11]]), data_sub))
+datCopy$HOAresid <- datCopy$HOA_median - datCopy$HOAmodeled
+
+HOA0 <- lm(formula(AQmodels_sub[[11]]), data_sub)
+summary(HOA0)
+
+data_sub$COAresid <- AQmodels_sub[[10]]$summary$residuals
+dataNoFilt$COAmodeled <- predict(lm(formula(AQmodels_sub[[10]]), dataNoFilt))
+dataNoFilt$COAresid <- dataNoFilt$COA_median - dataNoFilt$COAmodeled
+datCopy$COAmodeled <- predict(lm(formula(AQmodels_sub[[10]]), datCopy))
+data_sub$COAmodeled <- predict(lm(formula(AQmodels_sub[[10]]), data_sub))
+datCopy$COAresid <- datCopy$COA_median - datCopy$COAmodeled
+data_sub$COAresid <- data_sub$COA_median - data_sub$COAmodeled
+data_sub$Latitude<-data_sub$Latitutde
+
+COA0 <- lm(formula(AQmodels_sub[[1]]), data_sub)
+summary(COA0)
+
+HOAfitR2_allData <- summary(lm(HOAmodeled ~ HOA_median, data = datCopy))
+HOAfitR2_subset <- summary(lm(HOAmodeled ~ HOA_median, data = data_sub))
+
+COAfitR2_allData <- summary(lm(COAmodeled ~ COA_median, data = datCopy))
+COAfitR2_subset <- summary(lm(COAmodeled ~ COA_median, data = data_sub))
+
+
+
+######Notsure######
+ggplot() +geom_abline(linetype = 2) + geom_smooth(data = datCopy, aes(HOA_median,HOAmodeled), method='lm', color = 'blue3', se = FALSE) + geom_smooth(data = data_sub, aes(HOA_median,HOAmodeled), method='lm', color = 'red', se = FALSE) + geom_point(data=datCopy, aes(HOA_median,HOAmodeled), alpha =0.5, color = "blue3") + geom_point(data=data_sub, aes(HOA_median,HOAmodeled), fill = "red",shape=21, size = 2) + 
+  annotate("text",x = min(datCopy$HOA_median), y = max(datCopy$HOA_median), 
+           label = paste("R2 = ",COAfitR2_allData$r.squared), hjust = 0, vjust = 1, color = "blue") + 
+  annotate("text",x=max(datCopy$HOA_median),y=min(datCopy$HOAmodeled),vjust=0,hjust=1,
+           label =  paste("R2 = ",COAfitR2_subset$r.squared), color = "red") + coord_equal() + theme_bw()
+
+ggplot() +geom_abline(linetype = 2) + geom_smooth(data = datCopy, aes(COA_median,COAmodeled), method='lm', color = 'blue3', se = FALSE) + geom_smooth(data = data_sub, aes(COA_median,COAmodeled), method='lm', color = 'red', se = FALSE) + geom_point(data=datCopy, aes(COA_median,COAmodeled), alpha =0.5, color = "blue3") + geom_point(data=data_sub, aes(COA_median,COAmodeled), fill = "red",shape=21, size = 2) + 
+  annotate("text",x = min(datCopy$COA_median), y = max(datCopy$COA_median), 
+           label = paste("R2 = ",COAfitR2_allData$r.squared), hjust = 0, vjust = 1, color = "blue") + 
+  annotate("text",x=max(datCopy$COA_median),y=min(datCopy$COAmodeled),vjust=0,hjust=1,
+           label =  paste("R2 = ",COAfitR2_subset$r.squared), color = "red") + coord_equal() + theme_bw()
+
+
+
+
+#######Violin Plot of Site median sampling times vs Polygon #####
+ggplot(data_sub[data_sub$Polygon != "NoHome", ]) + 
+  geom_violin(aes(x = Polygon, y = hour_Med, group = Polygon)) + 
+  geom_jitter(aes(x = Polygon, y = hour_Med), width = 0.08, height= 0.02, shape = 21) + 
+  theme_bw()
+
+ggplot(data_sub[data_sub$Polygon != "NoHome", ]) + 
+  geom_violin(aes(x = Polygon, y = hour_Avg, group = Polygon)) + 
+  geom_jitter(aes(x = Polygon, y = hour_Avg), width = 0.08, height= 0.02, shape = 21) + 
+  theme_bw()
+
+
+#####cells downtown with highest residuals???#####
+dfLook <- data_sub[data_sub$Polygon == "Downtown", ]
+dfLook <- dfLook[order(dfLook$COAresid), ]
+cellIds_high = dfLook$NEAR_FID[1:10]
+dfLook <- dfLook[order(-dfLook$COAresid), ]
+cellId_low = dfLook$NEAR_FID[1:10]
+
+
+  
+
+
+#######Residuals by Polygon Plot##########
+data_sub <- merge(data_sub, polygondf,  by = "NEAR_FID")
+ggplot(data_sub, aes(x = Polygon, y = COAresid))  +
+    geom_violin(aes(group = Polygon)) + 
+    geom_jitter(aes(fill = COA_median), 
+                height = NULL, width = 0.08, shape = 21) +
+  scale_fill_gradientn(colours = matlab.like2(10)) +
+  labs(y = "Residual (ug m-3)") +
+  coord_cartesian(ylim=c(-2, 3)) +
+  theme_bw() +
+  theme(axis.line = element_line(color = "black"), 
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+
+#####Distribution of residuals vs. median sampling time####
+whichResid = "COAresid"
+ggplot(data_sub, aes(x = as.factor(round(hour_Med)))) +
+  geom_violin(aes_string(y = whichResid)) + 
+  geom_jitter(aes_string(y = whichResid), 
+              width = 0.08, shape = 21) +
+  labs(x = "Hour of day",
+       y = "Residual")
+
+
+
+#####Distribution of residuals vs. median sampling time - no downtown points#####
+whichResid = "COAresid"
+subsetdf4thisPlot <- data_sub[data_sub$Polygon != 'Downtown', ]
+subsetdf4thisPlot <- subsetdf4thisPlot[subsetdf4thisPlot$Polygon != 'NoHome', ]
+ggplot(subsetdf4thisPlot, aes(x = as.factor(round(hour_Med)))) +
+  geom_violin(aes_string(y = whichResid)) + 
+  geom_jitter(aes_string(y = whichResid, color = "Polygon"),
+              width = 0.08, shape = 21, size = 3) +
+  labs(x = "Hour of day",
+       y = "Residual") +
+  theme_bw()
+
+
+
+
+
+#######Residuals on the map########
+myLocation2 <- c((median(dataNoFilt$Longitude)-0.01), (median(dataNoFilt$Latitude)+0.003))
+lon_range <- extendrange( dataNoFilt$Longitude )
+lat_range <- extendrange( dataNoFilt$Latitude )
+calc <- calc_zoom(lon_range, lat_range)
+routemap <- get_map(location = myLocation2, source = "google", maptype = "terrain", zoom = calc)
+whichResid = "HOAresid"
+ggmap(routemap) +
+  geom_point(data = data_sub, 
+             aes(x = Longitude, y = Latitutde),
+             alpha = 0, size = 1) +
+  geom_point(data = data_sub, 
+             aes_string(x = 'Longitude', y = 'Latitutde', 
+                 color = whichResid), size = 2, shape = 21, stroke=1) + scale_color_gradient2(low = "red", mid = "gray",
+                       high = "blue", midpoint = 0, limits = c(-1,1))
+
+
+
+
+
+
+####make map plot of LUR results#####
+myLocation2 <- c((median(dataNoFilt$Longitude)-0.01), (median(dataNoFilt$Latitude)+0.003))
+lon_range <- extendrange( dataNoFilt$Longitude )
+lat_range <- extendrange( dataNoFilt$Latitude )
+
+calc <- calc_zoom(lon_range, lat_range)
+routemap <- get_map(location = myLocation2, source = "google", maptype = "terrain", zoom = calc)
+ggmap(routemap) +
+  geom_point(data = data_sub, 
+             aes(x = Longitude, y = Latitutde),
+             alpha = 0, size = 1) +
+  geom_point(data = data_sub, 
+             aes(x = Longitude, y = Latitutde, 
+                        color = COAresid), size = 2, shape = 21, stroke=1) + 
+  scale_colour_gradientn(colours = matlab.like2(10))
+
+
+
+mapPlot2 = function(plotStr){  
+  testMap <<- ggmap(routemap) +
+               geom_point(data = data_sub, 
+                  aes(x = Longitude.x, y = Latitutde),
+                          alpha = 0, size = 1) +
+             geom_point(data = data_sub, 
+              aes_string(x = "Longitude.x", y = "Latitutde", 
+                         col = plotStr), size = 1, shape = 1, stroke =1) + 
+             scale_colour_gradientn(colours = matlab.like2(10))
+  print(testMap)
+  saveStr <- c(plotStr,".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  print(saveStr)
+  ggsave(saveStr)
+}
+
+mapPlot3 = function(plotStr){  
+  testMap <<- ggmap(routemap) +
+    geom_point(data = dataNoFilt, 
+               aes(x = Longitude, y = Latitutde),
+               alpha = 0, size = 1) +
+    geom_point(data = dataNoFilt, 
+               aes_string(x = "Longitude", y = "Latitutde", 
+                          col = plotStr), size = 1, shape = 1, stroke =1) + 
+    scale_colour_gradientn(colours = matlab.like2(10))
+  print(testMap)
+  saveStr <- c(plotStr,".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  print(saveStr)
+  ggsave(saveStr)
+}
+
+
+mapPlotJustData = function(plotStr){  
+  testMap <<- ggmap(routemap) +
+    geom_point(data = data, 
+               aes(x = Longitude, y = Latitutde),
+               alpha = 0.5, size = 1) +
+    geom_point(data = data, 
+               aes_string(x = "Longitude", y = "Latitutde", 
+                          col = plotStr), size = 2) + 
+    scale_colour_gradientn(colours = matlab.like2(10), limits=c(0.2,0.55), oob=squish)
+  print(testMap)
+  saveStr <- c(plotStr,"_justdata10DD",".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  print(saveStr)
+  ggsave(saveStr)
+  
+}
+  
+
+#old plot, not so good
+mapPlot = function(plotStr){
+    p <<- ggplot(data = data_sub, aes(x = Longitude, y = Latitutde)) +
+    geom_point(aes_string(col = plotStr, size = plotStr)) + 
+    scale_color_gradient(low="blue", high="red") +
+    coord_equal()
+  print(p)
+  #this stuff does not work within the function and I don't know why not
+  saveStr <- c(plotStr,".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  print(saveStr)
+  ggsave(saveStr, height = 4)
+}
+
+
+
+
+
+###make scatter plot
+scatterPlot_sub = function(plotStr,num){ #plotStr = species name  , #num = index for species 1:8
+  modelSub <- AQmodels_sub[[num]]
+  modeled <- predict(lm(formula(modelSub), data_sub))
+  plotStr2 <- paste(plotStr,"_median",sep="")
+  measured <- data_sub[plotStr2]
+  plotDF <- data.frame(measured,modeled)
+  names(plotDF)[1]<-paste("measured")
+  textBoxform <- formula(AQmodels_sub[[num]])
+  wrapper <- function(x, ...) paste(strwrap(x, ...), collapse = "\n")
+  ggplot(plotDF, aes(x = measured, y = modeled)) +
+    geom_point(shape = 21) +
+    scale_color_gradient(low="blue", high="red") +
+    ggtitle(plotStr, subtitle = NULL) +
+    geom_abline(linetype = 2) +
+    annotate("text", x=max(measured)/1.2,y=max(measured)/4, label =  wrapper(textBoxform, width = 20)) +
+    annotate("text", x=max(measured)/4,y=max(measured)/1.3, label =  paste("R2 = ",AQmodels_sub[[num]]$summary$r.squared)) +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    scale_x_continuous(limits = c(0,max(measured))) + 
+    scale_y_continuous(limits = c(0,max(measured))) +
+    coord_equal()
+}
+#example: scatterPlot_sub("HOA",2)
+
+scatterPlot_full = function(plotStr,num){
+  modelSub <- AQmodels_sub[[num]]
+  modeled <- predict(lm(formula(modelSub), data))
+  plotStr2 <- paste(plotStr,"_avg",sep="")
+  measured <- data[plotStr2]
+  plotDF <- data.frame(measured,modeled)
+  names(plotDF)[1]<-paste("measured")
+  ggplot(plotDF, aes(x = measured, y = modeled)) +
+    geom_point(aes(col = measured)) +
+    scale_color_gradient(low="blue", high="red")
+  
+}
+
+
+scatterplot_2species = function(plotStr1,plotStr2){
+  formula = paste(plotStr2,"~",plotStr1)
+  mod2spec <- lm(formula, data_sub)
+  print(summary(mod2spec))
+ p <<- ggplot(data_sub, aes_string(x = plotStr1, y = plotStr2)) +
+      geom_point() + 
+      geom_abline(linetype = 2) +
+      geom_abline(intercept = mod2spec$coefficients[1], slope = mod2spec$coefficients[2]) +
+   annotate("text", x=12,y=10, label =  paste("R2 = ",summary(mod2spec)$r.squared)) + 
+      theme_bw()  +
+   coord_equal()
+  print(p)
+  saveStr <- c(plotStr1,plotStr2,"_15DD",".pdf")
+  saveStr <- paste(saveStr,collapse="")
+  print(saveStr)
+    ggsave(saveStr)
+}
+
+
+###########Histograms#####################################
+#all speices
+data4hist <- subset(data_sub, select = DVsmalllist)
+data4hist <- melt(data4hist)
+hist <- ggplot(data4hist, aes(value, fill = variable)) +
+          geom_histogram(binwidth = 0.05) +
+          FacetGrid(~variable, scales = 'free') +
+          labs(x = "Concentration [ug m-3]")
+hist
+
+#land-use road stuff
+data <- dataNoFilt[dataNoFilt$count >= 5,] 
+roadVars = c("Total_Road_50","Total_Road_100","Total_Road_250")
+#,"Total_Road_500","Total_Road_1000","Total_Road_2500","Hwy_Road_50","Hwy_Road_100","Hwy_Road_250","Hwy_Road_500","Hwy_Road_1000","Hwy_Road_2500","Maj_Road_50","Maj_Road_100","Maj_Road_250","Major_Road_500","Major_Road_1000","Major_Road_2500","Res_Road_50","Res_Road_100","Res_Road_250","Res_Road_500","Res_Road_1000","Res_Road_2500")
+roadVars = c("Hwy_Road_50","Hwy_Road_100")#,"Hwy_Road_250","Hwy_Road_500","Hwy_Road_1000","Hwy_Road_2500")
+data4histRoad <- subset(data, select = roadVars)
+data4histRoad <- melt(data4histRoad)
+hist <- ggplot(data4histRoad, aes(value, fill = variable)) +
+  geom_histogram(bins=150) +
+  facet_grid(variable ~. , scales = 'free_y') +
+  labs(x = "Sum of highway road length in buffer")
+hist
+ggsave("test.pdf", height = 4)
+
+
+
+#OA factors and total OA
+data4histPMF <- subset(data, select = c(OAfactors_meds,"HROrg_median"))
+data4histPMF <- melt(data4histPMF)
+hist <- ggplot(data4histPMF, aes(value, fill = variable)) +
+  geom_histogram(binwidth = 0.05) +
+  facet_grid(variable ~. , scales = 'free_y') +
+  xlim(0,15) +
+  labs(x = "Concentration [ug m-3]")
+hist
+ggsave("factorDistsMedians_10DD.pdf", height = 4)
+
+#traffic
+data4histtraf <- subset(data, select = c(trafficNonAMS))
+data4histtraf <- melt(data4histtraf)
+hist <- ggplot(data4histtraf, aes(value, fill = variable)) +
+  geom_histogram() +
+  facet_grid(. ~ variable, scales = 'free') +
+  labs(x = "xxxxx")
+hist
+
+#PM25Ref
+data4histRefMon <- subset(datCopy, select = c("PM25ref_median","PM25ref_avg"))
+data4histRefMon <- melt(data4histRefMon)
+hist <- ggplot(data4histRefMon, aes(value, fill = variable)) +
+  geom_histogram() +
+  facet_grid(variable ~ ., scales = 'free') +
+  labs(x = "xxxxx")
+hist
+
+normalizedcolumns = c(DVsmallList_meds,"PM25ref_avg")
+data4histNormalize = subset(data_sub, select = normalizedcolumns)
+#data4histNormalize <- normalize(data4histNormalize, method = "standardize")
+data4histNormalize <- melt(data4histNormalize)
+hist <- ggplot(data4histNormalize, aes(value, fill = variable)) +
+  geom_histogram(binwidth = 0.05) +
+  facet_grid(variable ~ ., scales = 'free') +
+  labs(x = "Concentration") +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  theme(strip.text.y  = element_text(angle = 0, hjust = 1)) +
+  theme(legend.position="none")
+hist
+
+normalizedcolumns = c("PM25ref_avg", DVsmallList)
+data4histNormalize = subset(datCopy, select = normalizedcolumns)
+#data4histNormalize <- normalize(data4histNormalize, method = "standardize")
+data4histNormalize <- melt(data4histNormalize)
+hist <- ggplot(data4histNormalize, aes(value, fill = variable)) +
+  geom_histogram(binwidth = 0.1) +
+  facet_grid(variable ~ ., scales = 'free') +
+  labs(x = "Concentration")
+hist
+
+
+
+
+###############################################################
+r2big$binary <- ifelse(r2big$DriveDays > 9, 1, 0)
+ManualR2 <-  r2big_AllNumSites_eachDriveDay
+meltManualR2 <- melt(ManualR2, measure.vars = DVsmallList_meds)
+ManualR2 <-  r2big_18DDNumSites_eachDriveDay
+meltManualR2_18DDNumSites <- melt(ManualR2, measure.vars = DVsmallList_meds)
+
+# test<- meltManualR2[meltManualR2$variable=="COA_median" , ]
+colnames(meltManualR2)
+p <- ggplot(meltManualR2,#[meltManualR2$variable=="SVOOA_median" , ], 
+            aes(x = variable, y = value, color = variable)) +
+  geom_boxplot() + 
+  scale_y_continuous(limits = c(0,1))+
+ facet_wrap(vars(DriveDays)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+p
+
+variable = "SVOOA_median"
+p <- ggplot(data = meltManualR2[meltManualR2$variable==variable , ], 
+            aes(x = DriveDays, y = value, group = DriveDays)) +#, color = variable)) +
+  geom_point(aes(color = "All possible sites"), size = 4) + 
+  geom_boxplot(data = meltManualR2_18DDNumSites[meltManualR2_18DDNumSites$variable==variable , ], aes(x = DriveDays, y = value, group = DriveDays, color = "160 sites\n(number with 18+DD)"), alpha = 0) +
+  scale_y_continuous(limits = c(0,1))+
+  # facet_wrap(vars(DriveDays)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(y = "R squared") +
+  ggtitle(paste(variable,": model performance with # drive days"))
+p
+
+
+p <- ggplot(data = meltManualR2, 
+            aes(x = DriveDays, y = value, group = DriveDays, shape = variable, color = variable)) +#, color = variable)) +
+  geom_point(size = 3) + 
+  scale_y_continuous(limits = c(0,1))+
+  scale_shape_manual(values = 0:10) +
+  # facet_wrap(vars(DriveDays)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(y = "R squared") +
+  ggtitle(paste("Model performance with # drive days for each factor"))
+p
+
+xmax = max(r2big_AllSites_eachDriveDay$DriveDays)
+ymax = max(r2big_AllSites_eachDriveDay$NumSites)
+ggplot(r2big_AllSites_eachDriveDay) + geom_point(aes(x = DriveDays, y = NumSites)) + scale_y_continuous(limits = c(0,ymax)) + scale_x_continuous(limits = c(0,xmax))
+
+# Need to save a dataframe with:
+#   
+#   -R2 values
+#   -formulas
+#   -coefficients
+#   -column for species name
+#   -drivedays
+#   -subset N sites
+#   -identifierstring 
+
+####getting familiar with Cross-validation####
+library(DAAG)
+
+COA1 <- lm(formula(AQmodels_sub[[10]]$formula), data_sub)
+Tenfoldcv_COA <- cv.lm(COA1$model, COA1, m=10, legend.pos = "topleft")
+summary(COA1)
+cor(Tenfoldcv_COA$COA_median,Tenfoldcv_COA$cvpred)**2
+
+HOA1 <- lm(formula(AQmodels_sub[[11]]$formula), data_sub)
+Tenfoldcv_HOA <- cv.lm(HOA1$model, HOA1, m=10, legend.pos = "topleft")
+summary(HOA1)
+cor(Tenfoldcv_HOA$HOA_median,Tenfoldcv_HOA$cvpred)**2
+
+SVOOA1 <- lm(formula(AQmodels_sub[[12]]$formula), data_sub)
+Tenfoldcv_SVOOA <- cv.lm(SVOOA1$model, SVOOA1, m=10, legend.pos = "topleft")
+summary(SVOOA1)
+cor(Tenfoldcv_SVOOA$SVOOA_median,Tenfoldcv_SVOOA$cvpred)**2
+
+NRPM11 <- lm(formula(AQmodels_sub[[18]]$formula), data_sub)
+Tenfoldcv_NRPM1 <- cv.lm(NRPM11$model, NRPM11, m=10, legend.pos = "topleft")
+summary(NRPM11)
+cor(Tenfoldcv_NRPM1$NRPM1_median,Tenfoldcv_NRPM1$cvpred)**2

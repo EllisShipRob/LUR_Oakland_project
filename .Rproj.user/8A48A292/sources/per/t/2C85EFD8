@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1538509077175.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "2C85EFD8",
+    "lastKnownWriteTime" : 6066188611752034310,
+    "last_content_update" : 1538509077175,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "82ADC921",
+        "caption" : "dfmodelSaves_formapCOA",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=dfmodelSaves_formapCOA&cache_key=82ADC921",
+        "displayedObservations" : "208",
+        "environment" : "",
+        "object" : "dfmodelSaves_formapCOA",
+        "preview" : "0",
+        "totalObservations" : "208",
+        "variables" : "10"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

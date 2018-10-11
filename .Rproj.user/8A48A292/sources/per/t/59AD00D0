@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1538416963583.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2630599370",
+    "id" : "59AD00D0",
+    "lastKnownWriteTime" : 1536860770,
+    "last_content_update" : 1536860770,
+    "path" : "~/Dropbox/RCode/Oakland/LUR_groundUpRedo_20180723/LUR_ScriptsRedo_20180723.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "62,252",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

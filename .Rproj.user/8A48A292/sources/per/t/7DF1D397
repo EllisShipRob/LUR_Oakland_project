@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1538417025830.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2599343903",
+    "id" : "7DF1D397",
+    "lastKnownWriteTime" : 1532358454,
+    "last_content_update" : 1532358454,
+    "path" : "~/Dropbox/RCode/Oakland/LUR_modelbuilding_2/LUR_implement_ESR_2.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "548,0",
+        "scrollLine" : "543"
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

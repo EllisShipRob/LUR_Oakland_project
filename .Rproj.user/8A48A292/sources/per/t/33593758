@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1536861068945.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3700432996",
+    "id" : "33593758",
+    "lastKnownWriteTime" : 1539188502,
+    "last_content_update" : 1539188502939,
+    "path" : "~/Dropbox/RCode/Oakland/GridCells/f200m/f200m.R",
+    "project_path" : "f200m.R",
+    "properties" : {
+        "cursorPosition" : "252,2",
+        "scrollLine" : "236",
+        "source_window_id" : "w2ngw02tx8jef"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
